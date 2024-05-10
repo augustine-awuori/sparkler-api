@@ -4,6 +4,7 @@ import Joi from "joi";
 export const User = mongoose.model(
   "User",
   new mongoose.Schema({
+    avatar: String,
     email: {
       type: String,
       required: true,
@@ -24,6 +25,7 @@ export const User = mongoose.model(
 
 export const validateUser = (user) =>
   Joi.object({
+    avatar: Joi.string(),
     email: Joi.string().required(),
     name: Joi.string().required(),
   }).validate(user);

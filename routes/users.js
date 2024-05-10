@@ -6,13 +6,13 @@ import validate from "../middlewares/validate";
 const router = express.Router();
 
 router.post("/", validate(validateUser), async (req, res) => {
-  const { email, name } = req.body;
+  const { avatar, email, name } = req.body;
 
   let user = await User.findOne({ email });
   if (user)
     return res.status(400).send({ error: "User is already registered" });
 
-  user = new User({ email, name });
+  user = new User({ avatar, email, name });
   await user.save();
 
   res.status(201).send(user);
