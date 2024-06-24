@@ -1,7 +1,7 @@
 import winston from "winston";
 
 export default function (err, _req, res) {
-  winston.error(err.message);
+  console.error(err.message);
 
   if (typeof res.status !== "function") return;
 
