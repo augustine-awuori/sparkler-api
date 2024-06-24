@@ -1,7 +1,5 @@
-import winston from "winston";
-
 export default function (err, _req, res) {
-  console.error(err.message);
+  if (err.message) console.error(err.message);
 
   if (typeof res.status !== "function") return;
 
