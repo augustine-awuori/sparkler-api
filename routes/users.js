@@ -11,8 +11,7 @@ router.post("/", validate(validateUser), async (req, res) => {
   const { avatar, email, name } = req.body;
 
   let user = await User.findOne({ email });
-  if (user)
-    return res.status(400).send({ error: "User is already registered" });
+  if (user) return res.send(user);
 
   user = new User({ avatar, email, name });
   user.feedToken = getUserFeedToken(user._id);

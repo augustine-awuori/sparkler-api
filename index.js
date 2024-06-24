@@ -1,5 +1,4 @@
 import express from "express";
-import winston from "winston";
 
 import db from "./startup/db.js";
 import logger from "./startup/logging.js";
