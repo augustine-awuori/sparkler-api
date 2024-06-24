@@ -1,4 +1,5 @@
 import express from "express";
+import stream from "getstream";
 
 import { User, validateUser } from "../models/user.js";
 import auth from "../middlewares/auth.js";
@@ -23,6 +24,20 @@ router.get("/", async (_req, res) => {
   const users = await User.find({});
 
   res.send(users);
+});
+
+router.get("/feedToken", auth, async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) return res.status(404).send({ error: "User doesn't exist" });
+
+  const userToken = stream
+    .connect(process.env.feedApiKey, process.env.feedSecretKey)
+    .createUserToken(user._id.toString());
+  user.feedToken = userToken;
+  await user.save();
+
+  res.send(userToken);
 });
 
 router.patch("/", auth, async (req, res) => {
