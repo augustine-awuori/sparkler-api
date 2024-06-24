@@ -10,6 +10,7 @@ export const User = mongoose.model(
       required: true,
       unique: true,
     },
+    feedToken: String,
     name: {
       type: String,
       required: true,
