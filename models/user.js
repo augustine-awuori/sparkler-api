@@ -32,9 +32,10 @@ schema.methods.generateAuthToken = function () {
   return jwt.sign(
     {
       _id: this._id,
+      avatar: this.avatar,
       email: this.email,
       feedToken: this.feedToken,
-      name: this.name
+      name: this.name,
     },
     process.env.jwtPrivateKey
   );
