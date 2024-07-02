@@ -30,7 +30,12 @@ const schema = new mongoose.Schema({
 
 schema.methods.generateAuthToken = function () {
   return jwt.sign(
-    { _id: this._id, email: this.email, name: this.name },
+    {
+      _id: this._id,
+      email: this.email,
+      feedToken: this.feedToken,
+      name: this.name
+    },
     process.env.jwtPrivateKey
   );
 };
