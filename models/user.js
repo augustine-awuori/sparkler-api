@@ -38,6 +38,7 @@ schema.methods.generateAuthToken = function () {
             _id: this._id,
             avatar: this.avatar,
             email: this.email,
+            username: this.username,
             feedToken: this.feedToken,
             name: this.name,
         },
