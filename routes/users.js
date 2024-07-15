@@ -2,7 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import _ from "lodash";
 
-import { getUserFeedToken } from "../services/users.js";
+import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import { User, validateUser } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import validate from "../middlewares/validate.js";
@@ -15,7 +15,8 @@ router.post("/", validate(validateUser), async (req, res) => {
   let user = await User.findOne({ email });
   if (user) return res.status(400).send({ error: "Email is already taken" });
 
-  user = new User({ email, name });
+  const username = await findUniqueUsername(name);
+  user = new User({ email, name, username });
   user.feedToken = getUserFeedToken(user._id);
   const salt = await bcrypt.genSalt(10);
   user.password = await bcrypt.hash(password, salt);

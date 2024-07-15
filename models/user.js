@@ -9,6 +9,10 @@ const schema = new mongoose.Schema({
         required: true,
         unique: true,
     },
+    username: {
+        type: String,
+        unique: true,
+    },
     feedToken: String,
     name: {
         type: String,
