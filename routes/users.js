@@ -6,6 +6,7 @@ import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import { User, validateUser } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import validate from "../middlewares/validate.js";
+import mongoose from "mongoose";
 
 const router = express.Router();
 
@@ -34,6 +35,12 @@ router.get("/", async (_req, res) => {
 
   res.send(users);
 });
+
+router.get('/:username', async (req, res) => {
+  const user = await User.findOne({ username: req.params.username });
+
+  user ? res.send(user) : res.status(404).send({ error: 'User not found' })
+})
 
 router.get("/feedToken", auth, async (req, res) => {
   const user = await User.findById(req.user._id);
