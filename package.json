@@ -25,6 +25,7 @@
     "mongoose": "^8.3.4",
     "nodemon": "^3.1.0",
     "serve-static": "^1.15.0",
+    "stream-chat": "^8.37.0",
     "winston": "^3.13.0",
     "winston-mongodb": "^5.1.1"
   },
