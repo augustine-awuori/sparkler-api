@@ -1,6 +1,7 @@
 import { StreamChat } from "stream-chat";
 import express from "express";
 
+import auth from "../middlewares/auth.js";
 import userService from '../services/users.js';
 
 const router = express.Router();
