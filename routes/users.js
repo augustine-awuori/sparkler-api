@@ -6,7 +6,6 @@ import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import { User, validateUser } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import validate from "../middlewares/validate.js";
-import mongoose from "mongoose";
 
 const router = express.Router();
 

@@ -14,6 +14,7 @@ const schema = new mongoose.Schema({
         unique: true,
     },
     feedToken: String,
+    chatToken: String,
     name: {
         type: String,
         required: true,
@@ -40,6 +41,7 @@ schema.methods.generateAuthToken = function () {
             email: this.email,
             username: this.username,
             feedToken: this.feedToken,
+            chatToken: this.chatToken,
             name: this.name,
         },
         process.env.jwtPrivateKey

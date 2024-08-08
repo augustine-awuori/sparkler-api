@@ -1,4 +1,5 @@
 import stream from "getstream";
+import { isValidObjectId } from "mongoose";
 
 import { User } from "../models/user.js";
 
@@ -28,3 +29,21 @@ export async function findUniqueUsername(name) {
 
   return username;
 }
+
+const findByIdAndUpdate = async (id, update, options) => {
+  if (!isValidObjectId(id)) return;
+
+  return await User.findByIdAndUpdate(id, update, options);
+};
+
+const exists = async (userId) => {
+  if (isValidObjectId(userId)) return await User.findById(userId);
+};
+
+export const findById = async (id) => {
+  const user = await exists(id);
+
+  return user;
+};
+
+export default { findById, findByIdAndUpdate }
