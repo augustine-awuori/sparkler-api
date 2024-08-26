@@ -40,13 +40,6 @@ router.get("/", async (_req, res) => {
   const users = await User.find({});
 
   res.send(users);
-
-  users.forEach(async user => {
-    if (!user.chatToken) {
-      user.chatToken = getChatToken(user._id);
-      await user.save();
-    }
-  });
 });
 
 router.get('/:username', async (req, res) => {
