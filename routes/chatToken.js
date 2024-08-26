@@ -20,15 +20,17 @@ router.post("/", auth, async (req, res) => {
             .status(404)
             .send({ error: "You don't exist in the database. Sign Up" });
 
-    let token = "";
+    let chatToken = "";
     if (user.chatToken)
-        token = user.chatToken;
+        chatToken = user.chatToken;
     else {
-        token =serverClient.createToken(userId)
-        await userService.findByIdAndUpdate(userId, { chatToken: token });
+        chatToken = serverClient.createToken(userId)
+        await userService.findByIdAndUpdate(userId, { chatToken });
     }
 
-    res.send(token);
+    res
+        .header("x-auth-token", user.generateAuthToken())
+        .send(chatToken);
 });
 
 export default router;
