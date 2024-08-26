@@ -1,6 +1,7 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import _ from "lodash";
+import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import { User, validateUser } from "../models/user.js";
