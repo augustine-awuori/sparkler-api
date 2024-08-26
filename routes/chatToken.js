@@ -11,6 +11,10 @@ const serverClient = StreamChat.getInstance(
     process.env.chatApiSecret
 );
 
+export function getChatToken(userId) {
+    return serverClient.createToken(userId)
+}
+
 router.post("/", auth, async (req, res) => {
     const userId = req.user._id;
 
@@ -24,7 +28,7 @@ router.post("/", auth, async (req, res) => {
     if (user.chatToken)
         token = user.chatToken;
     else {
-        token = serverClient.createToken(userId);
+        token = getChatToken(userId);
         await userService.findByIdAndUpdate(userId, { chatToken: token });
     }
 

@@ -4,6 +4,7 @@ import _ from "lodash";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import { User, validateUser } from "../models/user.js";
+import { getChatToken } from './chatToken.js';
 import auth from "../middlewares/auth.js";
 import validate from "../middlewares/validate.js";
 
@@ -18,7 +19,7 @@ router.post("/", validate(validateUser), async (req, res) => {
   const username = await findUniqueUsername(name);
   user = new User({ email, name, username });
   user.feedToken = getUserFeedToken(user._id);
-  user.chatToken = serverClient.createToken(user._id);
+  user.chatToken = getChatToken(user._id);
   const salt = await bcrypt.genSalt(10);
   user.password = await bcrypt.hash(password, salt);
   await user.save();
@@ -32,6 +33,13 @@ router.post("/", validate(validateUser), async (req, res) => {
 
 router.get("/", async (_req, res) => {
   const users = await User.find({});
+
+  users.forEach(async user => {
+    if (!user.chatToken) {
+      user.chatToken = getChatToken(user._id);
+      await user.save();
+    }
+  });
 
   res.send(users);
 });
