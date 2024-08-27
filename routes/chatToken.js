@@ -14,7 +14,7 @@ const serverClient = StreamChat.getInstance(
 router.post("/", auth, async (req, res) => {
     const userId = req.user._id;
 
-    const user = await userService.findById(userId);
+    let user = await userService.findById(userId);
     if (!user)
         return res
             .status(404)
@@ -25,7 +25,8 @@ router.post("/", auth, async (req, res) => {
         chatToken = user.chatToken;
     else {
         chatToken = serverClient.createToken(userId)
-        await userService.findByIdAndUpdate(userId, { chatToken });
+        await userService.findByIdAndUpdate(userId, { chatToken }, { new: true });
+        user = await userService.findById(userId);
     }
 
     res
