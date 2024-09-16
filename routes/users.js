@@ -36,17 +36,38 @@ router.post("/", validate(validateUser), async (req, res) => {
     .send(_.omit(user, "password"));
 });
 
+router.post("/quick", validate(validateUser), async (req, res) => {
+  const { avatar, email, name } = req.body;
+
+  let user = await service.findOne({ email });
+
+  if (!user) {
+    user = new User({
+      avatar,
+      name,
+      email,
+      username: name.toLowerCase().replace(" ", ""),
+    });
+    await user.save();
+  }
+
+  res
+    .header("x-auth-token", user.generateAuthToken())
+    .header("access-control-expose-headers", "x-auth-token")
+    .send(_.omit(user, ["password"]));
+});
+
 router.get("/", async (_req, res) => {
   const users = await User.find({});
 
   res.send(users);
 });
 
-router.get('/:username', async (req, res) => {
+router.get("/:username", async (req, res) => {
   const user = await User.findOne({ username: req.params.username });
 
-  user ? res.send(user) : res.status(404).send({ error: 'User not found' })
-})
+  user ? res.send(user) : res.status(404).send({ error: "User not found" });
+});
 
 router.get("/feedToken", auth, async (req, res) => {
   const user = await User.findById(req.user._id);
