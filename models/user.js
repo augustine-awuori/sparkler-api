@@ -3,7 +3,7 @@ import Joi from "joi";
 import jwt from "jsonwebtoken";
 
 const schema = new mongoose.Schema({
-    avatar: String,
+    profileImage: String,
     email: {
         type: String,
         required: true,
@@ -37,7 +37,7 @@ schema.methods.generateAuthToken = function () {
     return jwt.sign(
         {
             _id: this._id,
-            avatar: this.avatar,
+            profileImage: this.profileImage,
             email: this.email,
             username: this.username,
             feedToken: this.feedToken,
@@ -52,7 +52,7 @@ export const User = mongoose.model("User", schema);
 
 export const validateUser = (user) =>
     Joi.object({
-        avatar: Joi.string(),
+        profileImage: Joi.string(),
         email: Joi.string().required(),
         name: Joi.string(),
         password: Joi.string(),
