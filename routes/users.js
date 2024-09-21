@@ -37,15 +37,13 @@ router.post("/", validate(validateUser), async (req, res) => {
 });
 
 router.post("/quick", validate(validateUser), async (req, res) => {
-  const { profileImage, email, name } = req.body;
+  const { email, name } = req.body;
 
   let user = await User.findOne({ email });
 
   if (!user) {
     user = new User({
-      profileImage,
-      name,
-      email,
+      ...req.body,
       username: name.toLowerCase().replace(" ", ""),
     });
     await user.save();

@@ -3,6 +3,7 @@ import Joi from "joi";
 import jwt from "jsonwebtoken";
 
 const schema = new mongoose.Schema({
+    coverImage: String,
     profileImage: String,
     email: {
         type: String,
@@ -52,6 +53,7 @@ export const User = mongoose.model("User", schema);
 
 export const validateUser = (user) =>
     Joi.object({
+        coverImage: Joi.string(),
         profileImage: Joi.string(),
         email: Joi.string().required(),
         name: Joi.string(),
