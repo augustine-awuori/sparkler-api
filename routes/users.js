@@ -22,10 +22,8 @@ router.post("/", validate(validateUser), async (req, res) => {
   if (user) return res.status(400).send({ error: "Email is already taken" });
 
   const username = await findUniqueUsername(name);
-  user = new User({ email, name, username });
   const token = serverClient.createToken(user._id);
-  user.feedToken = token;
-  user.chatToken = token;
+  user = new User({ email, name, username, feedToken: token, chatToken: token });
   const salt = await bcrypt.genSalt(10);
   user.password = await bcrypt.hash(password, salt);
   await user.save();
