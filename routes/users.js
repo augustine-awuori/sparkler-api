@@ -45,6 +45,10 @@ router.post("/quick", validate(validateUser), async (req, res) => {
       ...req.body,
       username: name.toLowerCase().replace(" ", ""),
     });
+    const token = serverClient.createToken(user._id);
+    user.feedToken = token;
+    user.chatToken = token;
+
     await user.save();
   }
 
