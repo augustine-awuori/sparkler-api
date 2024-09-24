@@ -11,8 +11,13 @@ router.post("/", validator(validateUser), async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).send({ error: "Email isn't registered." });
 
-    if (!user.password)
-        return res.send(user.generateAuthToken());
+    if (!password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+        await user.save();
+
+        return res.send(user.generateAuthToken())
+    }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
 
