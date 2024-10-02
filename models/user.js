@@ -12,7 +12,7 @@ const schema = new mongoose.Schema({
     },
     verified: {
         type: Boolean,
-        default: false
+        default: false,
     },
     username: {
         type: String,
@@ -29,6 +29,12 @@ const schema = new mongoose.Schema({
         minlength: 6,
         maxlength: 1024,
         trim: true,
+        validate: {
+            validator: function (value) {
+                return !value || value.length >= 6;
+            },
+            message: 'Password must be at least 6 characters long',
+        },
     },
     timestamp: {
         type: Number,
@@ -61,7 +67,7 @@ export const validateUser = (user) =>
         profileImage: Joi.string().optional(),
         email: Joi.string().required(),
         name: Joi.string().required(),
-        password: Joi.string(),
+        password: Joi.string().min(6),
     }).validate(user);
 
 export const validateUserWithGoogleAccount = (user) =>
@@ -72,4 +78,3 @@ export const validateUserWithGoogleAccount = (user) =>
         name: Joi.string().required(),
         password: Joi.string().optional(),
     }).validate(user);
-
