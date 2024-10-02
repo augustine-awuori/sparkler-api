@@ -38,9 +38,6 @@ router.post("/", validate(validateUser), async (req, res) => {
 router.post("/quick", validate(validateUserWithGoogleAccount), async (req, res) => {
   const { email, name, } = req.body;
 
-  if (!email || !name)
-    return res.status(400).send({ error: 'Invalid email and/or name' });
-
   let user = await User.findOne({ email });
 
   if (!user) {
