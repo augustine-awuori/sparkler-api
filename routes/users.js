@@ -45,7 +45,7 @@ router.post("/quick", validate(validateUserWithGoogleAccount), async (req, res) 
       ...req.body,
       username: name.toLowerCase().replace(" ", ""),
     });
-    const token = serverClient.createToken(user._id);
+    const token = serverClient.createToken(user._id.toString());
     user.feedToken = token;
     user.chatToken = token;
 
