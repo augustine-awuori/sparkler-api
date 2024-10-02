@@ -4,7 +4,7 @@ import _ from "lodash";
 import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
-import { User, validateUser } from "../models/user.js";
+import { User, validateUser, validateUserWithGoogleAccount } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import validate from "../middlewares/validate.js";
 
@@ -35,7 +35,7 @@ router.post("/", validate(validateUser), async (req, res) => {
     .send(_.omit(user, "password"));
 });
 
-router.post("/quick", async (req, res) => {
+router.post("/quick", validate(validateUserWithGoogleAccount), async (req, res) => {
   const { email, name, } = req.body;
 
   if (!email || !name)

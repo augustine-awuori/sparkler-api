@@ -57,9 +57,19 @@ export const User = mongoose.model("User", schema);
 
 export const validateUser = (user) =>
     Joi.object({
-        coverImage: Joi.string(),
-        profileImage: Joi.string(),
+        coverImage: Joi.string().optional(),
+        profileImage: Joi.string().optional(),
         email: Joi.string().required(),
-        name: Joi.string(),
+        name: Joi.string().required(),
         password: Joi.string(),
     }).validate(user);
+
+export const validateUserWithGoogleAccount = (user) =>
+    Joi.object({
+        coverImage: Joi.string().optional(),
+        profileImage: Joi.string().optional(),
+        email: Joi.string().required(),
+        name: Joi.string().required(),
+        password: Joi.string().optional(),
+    }).validate(user);
+
