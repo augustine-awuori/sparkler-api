@@ -4,7 +4,11 @@ import _ from "lodash";
 import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
-import { User, validateUser, validateUserWithGoogleAccount } from "../models/user.js";
+import {
+  User,
+  validateUser,
+  validateUserWithGoogleAccount,
+} from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import validate from "../middlewares/validate.js";
 
@@ -23,7 +27,13 @@ router.post("/", validate(validateUser), async (req, res) => {
 
   const username = await findUniqueUsername(name);
   const token = serverClient.createToken(user._id);
-  user = new User({ email, name, username, feedToken: token, chatToken: token });
+  user = new User({
+    email,
+    name,
+    username,
+    feedToken: token,
+    chatToken: token,
+  });
   const salt = await bcrypt.genSalt(10);
   user.password = await bcrypt.hash(password, salt);
   await user.save();
@@ -35,28 +45,43 @@ router.post("/", validate(validateUser), async (req, res) => {
     .send(_.omit(user, "password"));
 });
 
-router.post("/quick", validate(validateUserWithGoogleAccount), async (req, res) => {
-  const { email, name, } = req.body;
+router.post(
+  "/quick",
+  validate(validateUserWithGoogleAccount),
+  async (req, res) => {
+    const { email, name } = req.body;
 
-  let user = await User.findOne({ email });
+    let user = await User.findOne({ email });
 
-  if (!user) {
-    user = new User({
-      ...req.body,
-      username: name.toLowerCase().replace(" ", ""),
-    });
-    const token = serverClient.createToken(user._id.toString());
-    user.feedToken = token;
-    user.chatToken = token;
+    let username = name.toLowerCase().replace(/\s+/g, "");
 
-    await user.save();
+    if (!user) {
+      let found = await User.findOne({ username });
+
+      while (found) {
+        const randomNum = Math.floor(Math.random() * 10000);
+        username = `${username}${randomNum}`;
+        found = await User.findOne({ username });
+      }
+
+      user = new User({
+        ...req.body,
+        username,
+      });
+
+      const token = serverClient.createToken(user._id.toString());
+      user.feedToken = token;
+      user.chatToken = token;
+
+      await user.save();
+    }
+
+    res
+      .header("x-auth-token", user.generateAuthToken())
+      .header("access-control-expose-headers", "x-auth-token")
+      .send(_.omit(user.toObject(), ["password"]));
   }
-
-  res
-    .header("x-auth-token", user.generateAuthToken())
-    .header("access-control-expose-headers", "x-auth-token")
-    .send(_.omit(user, ["password"]));
-});
+);
 
 router.get("/", async (_req, res) => {
   const users = await User.find({});
