@@ -35,8 +35,11 @@ router.post("/", validate(validateUser), async (req, res) => {
     .send(_.omit(user, "password"));
 });
 
-router.post("/quick", validate(validateUser), async (req, res) => {
-  const { email, name } = req.body;
+router.post("/quick", async (req, res) => {
+  const { email, name, } = req.body;
+
+  if (!email || !name)
+    return res.status(400).send({ error: 'Invalid email and/or name' });
 
   let user = await User.findOne({ email });
 
