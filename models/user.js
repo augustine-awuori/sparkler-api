@@ -10,6 +10,8 @@ const schema = new mongoose.Schema({
         required: true,
         unique: true,
     },
+    followers: Object,
+    following: Object,
     verified: {
         type: Boolean,
         default: false,

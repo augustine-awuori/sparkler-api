@@ -83,6 +83,44 @@ router.post(
   }
 );
 
+router.post("/followers", auth, async (req, res) => {
+  const { leaderId } = req.body;
+  if (!leaderId)
+    return res.status(400).send({ error: "Leader's ID not provided" });
+
+  const leader = await User.findById(leaderId);
+  if (!leader)
+    return res
+      .status(400)
+      .send({ error: "Leader doesn't exist in the database" });
+
+  const followerId = req.user._id;
+  const follower = await User.findById(followerId);
+  if (!follower)
+    return res
+      .status(404)
+      .send({ error: "Follower does not exist in the database" });
+
+  const followersOfLeader = leader.followers || {};
+  const followingOfFollower = follower.following || {};
+  if (followersOfLeader[followerId]) {
+    delete followersOfLeader[followerId];
+    delete followingOfFollower[leaderId];
+  } else {
+    followersOfLeader[followerId] = followerId;
+    followingOfFollower[leaderId] = leaderId;
+  }
+
+  await User.findByIdAndUpdate(leaderId, { followers: followersOfLeader });
+  res.send(
+    await User.findByIdAndUpdate(
+      followerId,
+      { following: followingOfFollower },
+      { new: true }
+    )
+  );
+});
+
 router.get("/", async (_req, res) => {
   const users = await User.find({});
 
