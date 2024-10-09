@@ -83,7 +83,7 @@ router.post(
   }
 );
 
-router.post("/followers", auth, async (req, res) => {
+router.patch("/followers", auth, async (req, res) => {
   const { leaderId } = req.body;
   if (!leaderId)
     return res.status(400).send({ error: "Leader's ID not provided" });
