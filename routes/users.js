@@ -84,41 +84,42 @@ router.post(
 );
 
 router.patch("/followers", auth, async (req, res) => {
-  const { leaderId } = req.body;
-  if (!leaderId)
-    return res.status(400).send({ error: "Leader's ID not provided" });
+  try {
+    const { leaderId } = req.body;
 
-  const leader = await User.findById(leaderId);
-  if (!leader)
-    return res
-      .status(400)
-      .send({ error: "Leader doesn't exist in the database" });
+    if (!leaderId)
+      return res.status(400).json({ error: "Leader's ID not provided" });
 
-  const followerId = req.user._id;
-  const follower = await User.findById(followerId);
-  if (!follower)
-    return res
-      .status(404)
-      .send({ error: "Follower does not exist in the database" });
+    const [leader, follower] = await Promise.all([
+      User.findById(leaderId),
+      User.findById(req.user._id)
+    ]);
 
-  const followersOfLeader = leader.followers || {};
-  const followingOfFollower = follower.following || {};
-  if (followersOfLeader[followerId]) {
-    delete followersOfLeader[followerId];
-    delete followingOfFollower[leaderId];
-  } else {
-    followersOfLeader[followerId] = followerId;
-    followingOfFollower[leaderId] = leaderId;
+    if (!leader)
+      return res.status(404).json({ error: "Leader does not exist" });
+
+    if (!follower)
+      return res.status(404).json({ error: "Follower does not exist" });
+
+    const isFollowing = !!leader.followers?.[follower._id];
+
+    const leaderUpdate = isFollowing
+      ? { $unset: { [`followers.${follower._id}`]: "" } }
+      : { $set: { [`followers.${follower._id}`]: follower._id } };
+
+    const followerUpdate = isFollowing
+      ? { $unset: { [`following.${leader._id}`]: "" } }
+      : { $set: { [`following.${leader._id}`]: leader._id } };
+
+    await Promise.all([
+      User.findByIdAndUpdate(leaderId, leaderUpdate),
+      User.findByIdAndUpdate(follower._id, followerUpdate, { new: true })
+    ]);
+
+    return res.send(await User.findById(req.user._id));
+  } catch (error) {
+    return res.status(500).json({ error: "Server error, please try again later" });
   }
-
-  await User.findByIdAndUpdate(leaderId, { followers: followersOfLeader });
-  res.send(
-    await User.findByIdAndUpdate(
-      followerId,
-      { following: followingOfFollower },
-      { new: true }
-    )
-  );
 });
 
 router.get("/", async (_req, res) => {
