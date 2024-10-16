@@ -101,7 +101,7 @@ router.patch("/followers", auth, async (req, res) => {
     if (!follower)
       return res.status(404).json({ error: "Follower does not exist" });
 
-    const isFollowing = Boolean(!leader.followers?.[follower._id]);
+    const isFollowing = !leader.followers?.[follower._id];
 
     const leaderUpdate = isFollowing
       ? { $unset: { [`followers.${follower._id}`]: "" } }
