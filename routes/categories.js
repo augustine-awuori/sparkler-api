@@ -1,7 +1,7 @@
 import express from "express";
 
 import { validate, Category } from "../models/category.js";
-import validatingWith from "../middleware/validate.js";
+import validatingWith from "../middlewares/validate.js";
 
 const router = express.Router();
 
