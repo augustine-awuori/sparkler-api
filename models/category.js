@@ -1,7 +1,7 @@
 import Joi from "joi";
 import mongoose from "mongoose";
 
-const Category = mongoose.model("Category", new mongoose.Schema({
+export const Category = mongoose.model("Category", new mongoose.Schema({
   label: {
     max: 50,
     min: 3,
@@ -12,7 +12,7 @@ const Category = mongoose.model("Category", new mongoose.Schema({
   },
 }));
 
-const validate = (category) =>
+export const validate = (category) =>
   Joi.object({
     label: Joi.string().min(3).max(50).required(),
   }).validate(category);
