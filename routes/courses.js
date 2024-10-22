@@ -17,7 +17,7 @@ router.post("/", [auth, validatingWith(validateCourse)], async (req, res) => {
 router.get("/", async (_req, res) => {
     const courses = await Course.find({})
         .populate("lecturer")
-        .populate("category");
+        .populate("department");
 
     res.send(courses);
 });
