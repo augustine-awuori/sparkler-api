@@ -6,7 +6,7 @@ import validatingWith from "../middlewares/validate.js";
 const router = express.Router();
 
 router.post("/", validatingWith(validateCourse), async (req, res) => {
-    const course = new Course(req.body);
+    const course = new Course({ ...req.body, lecturer: req.user._id });
 
     await course.save();
 
