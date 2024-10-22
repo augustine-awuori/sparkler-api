@@ -52,7 +52,7 @@ router.post(
 );
 
 router.get("/", async (_req, res) => {
-    const users = await User.find({});
+    const users = await Person.find({});
 
     res.send(users);
 });
