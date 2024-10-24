@@ -1,24 +1,15 @@
 import express from 'express';
 import bcrypt from "bcrypt";
 
-import { User, validateUser } from "../models/user.js";
-import validator from "../middlewares/validate.js";
+import { User } from "../models/user.js";
 
 const router = express.Router();
 
-router.post("/", validator(validateUser), async (req, res) => {
+router.post("/", async (req, res) => {
     const { email, password } = req.body;
+
     const user = await User.findOne({ email });
     if (!user) return res.status(404).send({ error: "Email isn't registered." });
-
-    if (!password) {
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(password, salt);
-        await user.save();
-
-        return res.send(user.generateAuthToken())
-    }
-
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     return (isValidPassword)
