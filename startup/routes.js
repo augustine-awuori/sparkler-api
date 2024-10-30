@@ -8,6 +8,7 @@ import chatToken from "../routes/chatToken.js";
 import courses from "../routes/courses.js";
 import data from "../routes/data.js";
 import error from "../middlewares/error.js";
+import lessons from "../routes/lessons.js";
 import people from "../routes/people.js";
 import users from "../routes/users.js";
 
@@ -20,6 +21,7 @@ export default function (app) {
   app.use("/api/courses", courses);
   app.use("/api/chatToken", chatToken);
   app.use("/api/data", data);
+  app.use("/api/lessons", lessons);
   app.use("/api/people", people);
   app.use("/api/users", users);
   app.use(error);
