@@ -29,3 +29,5 @@ export const validateLesson = (lesson) =>
         notes: Joi.string().required(),
         title: Joi.string().min(3).trim().optional().allow(""),
     }).validate(lesson);
+
+export default { Lesson, validateLesson }

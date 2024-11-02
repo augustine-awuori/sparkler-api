@@ -1,9 +1,9 @@
 import express from "express";
 import mongoose from "mongoose";
 
-import { Lesson, validateLesson } from "../models/lesson";
-import auth from "../middlewares/auth";
-import validator from "../middlewares/validate";
+import { Lesson, validateLesson } from "../models/lesson.js";
+import auth from "../middlewares/auth.js";
+import validator from "../middlewares/validate.js";
 
 const router = express.Router();
 
