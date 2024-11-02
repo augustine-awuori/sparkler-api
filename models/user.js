@@ -56,6 +56,7 @@ schema.methods.generateAuthToken = function () {
             feedToken: this.feedToken,
             chatToken: this.chatToken,
             name: this.name,
+            verified: this.verified
         },
         process.env.jwtPrivateKey
     );
