@@ -51,12 +51,13 @@ schema.methods.generateAuthToken = function () {
     return jwt.sign(
         {
             _id: this._id,
-            profileImage: this.profileImage,
-            email: this.email,
-            username: this.username,
-            feedToken: this.feedToken,
+            bio: this.bio,
             chatToken: this.chatToken,
+            email: this.email,
+            feedToken: this.feedToken,
             name: this.name,
+            profileImage: this.profileImage,
+            username: this.username,
             verified: this.verified
         },
         process.env.jwtPrivateKey
