@@ -12,7 +12,7 @@ const serverClient = StreamChat.getInstance(
 );
 
 router.post("/", auth, async (req, res) => {
-    const userId = req.user._id;
+    const userId = req.user._id.toString();
 
     let user = await userService.findById(userId);
     if (!user)
