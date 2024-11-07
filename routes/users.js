@@ -27,7 +27,7 @@ router.post("/", validate(validateUser), async (req, res) => {
 
   const username = await findUniqueUsername(name);
   user = new User({ email, name, username });
-  const token = serverClient.createToken(user._id);
+  const token = serverClient.createToken(user._id.toString());
   user.feedToken = token;
   user.chatToken = token;
   const salt = await bcrypt.genSalt(10);
