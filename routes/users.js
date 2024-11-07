@@ -26,14 +26,10 @@ router.post("/", validate(validateUser), async (req, res) => {
   if (user) return res.status(400).send({ error: "Email is already taken" });
 
   const username = await findUniqueUsername(name);
+  user = new User({ email, name, username });
   const token = serverClient.createToken(user._id);
-  user = new User({
-    email,
-    name,
-    username,
-    feedToken: token,
-    chatToken: token,
-  });
+  user.feedToken = token;
+  user.chatToken = token;
   const salt = await bcrypt.genSalt(10);
   user.password = await bcrypt.hash(password, salt);
   await user.save();
@@ -92,7 +88,7 @@ router.patch("/followers", auth, async (req, res) => {
 
     const [leader, follower] = await Promise.all([
       User.findById(leaderId),
-      User.findById(req.user._id)
+      User.findById(req.user._id),
     ]);
 
     if (!leader)
@@ -113,12 +109,14 @@ router.patch("/followers", auth, async (req, res) => {
 
     await Promise.all([
       User.findByIdAndUpdate(leaderId, leaderUpdate),
-      User.findByIdAndUpdate(follower._id, followerUpdate, { new: true })
+      User.findByIdAndUpdate(follower._id, followerUpdate, { new: true }),
     ]);
 
     return res.send(await User.findById(req.user._id));
   } catch (error) {
-    return res.status(500).json({ error: "Server error, please try again later" });
+    return res
+      .status(500)
+      .json({ error: "Server error, please try again later" });
   }
 });
 
