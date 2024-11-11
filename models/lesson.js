@@ -20,6 +20,7 @@ export const Lesson = mongoose.model(
             ref: "Course",
             required: true,
         },
+        students: Object
     })
 );
 
@@ -28,6 +29,7 @@ export const validateLesson = (lesson) =>
         course: Joi.string().required(),
         notes: Joi.string().required(),
         title: Joi.string().min(3).trim().optional().allow(""),
+        students: Joi.object().optional()
     }).validate(lesson);
 
 export default { Lesson, validateLesson }
