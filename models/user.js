@@ -27,6 +27,10 @@ const schema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    invalid: {
+        type: Boolean,
+        default: false,
+    },
     password: {
         type: String,
         minlength: 6,
@@ -52,6 +56,7 @@ schema.methods.generateAuthToken = function () {
         {
             _id: this._id,
             bio: this.bio,
+            invalid: this.invalid,
             chatToken: this.chatToken,
             email: this.email,
             feedToken: this.feedToken,
@@ -70,10 +75,11 @@ export const validateUser = (user) =>
     Joi.object({
         bio: Joi.string().optional(),
         coverImage: Joi.string().optional(),
-        profileImage: Joi.string().optional(),
         email: Joi.string().required(),
+        invalid: Joi.string().optional(),
         name: Joi.string().required(),
         password: Joi.string().min(6),
+        profileImage: Joi.string().optional(),
     }).validate(user);
 
 export const validateUserWithGoogleAccount = (user) =>
