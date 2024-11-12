@@ -76,7 +76,7 @@ export const validateUser = (user) =>
         bio: Joi.string().optional(),
         coverImage: Joi.string().optional(),
         email: Joi.string().required(),
-        invalid: Joi.string().optional(),
+        invalid: Joi.boolean().optional(),
         name: Joi.string().required(),
         password: Joi.string().min(6),
         profileImage: Joi.string().optional(),
