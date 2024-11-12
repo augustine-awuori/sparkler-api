@@ -155,4 +155,10 @@ router.patch("/", auth, async (req, res) => {
   res.send(user);
 });
 
+router.delete("/", auth, async (req, res) => {
+  const result = await User.findByIdAndDelete(req.user._id);
+
+  res.send(result);
+});
+
 export default router;
