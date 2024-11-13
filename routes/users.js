@@ -144,6 +144,19 @@ router.get("/feedToken", auth, async (req, res) => {
   res.send(feedToken);
 });
 
+router.get("/profile/:username", async (req, res) => {
+  const user = await User.findOne({ username: req.params.username });
+
+  if (!user) return res.status(404).send({ error: "User not found" });
+
+  res.render("profile", {
+    ogTitle: `${user.name}'s Profile`,
+    ogDescription: user.bio,
+    ogImage: user.profileImage,
+    ogUrl: `https://sparkler.lol/${user.username}`,
+  });
+});
+
 router.patch("/", auth, async (req, res) => {
   const user = await User.findByIdAndUpdate(req.user._id, req.body, {
     new: true,
