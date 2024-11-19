@@ -22,6 +22,10 @@ const schema = new mongoose.Schema({
         unique: true,
     },
     feedToken: String,
+    youtube: String,
+    tiktok: String,
+    instagram: String,
+    customLink: String,
     chatToken: String,
     name: {
         type: String,
@@ -80,12 +84,20 @@ export const validateUser = (user) =>
         name: Joi.string().required(),
         password: Joi.string().min(6),
         profileImage: Joi.string().optional(),
+        youtube: Joi.string().optional(),
+        tiktok: Joi.string().optional(),
+        instagram: Joi.string().optional(),
+        customLink: Joi.string().optional(),
     }).validate(user);
 
 export const validateUserWithGoogleAccount = (user) =>
     Joi.object({
         coverImage: Joi.string().optional(),
         profileImage: Joi.string().optional(),
+        youtube: Joi.string().optional(),
+        tiktok: Joi.string().optional(),
+        instagram: Joi.string().optional(),
+        customLink: Joi.string().optional(),
         email: Joi.string().required(),
         name: Joi.string().required(),
         password: Joi.string().optional(),
