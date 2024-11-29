@@ -128,8 +128,8 @@ router.get("/", async (_req, res) => {
   res.send(users);
 });
 
-router.get("/userFollowings", async (req, res) => {
-  const { userId } = req.body;
+router.get("/userFollowings/:userId", async (req, res) => {
+  const { userId } = req.params;
 
   if (!mongoose.isValidObjectId(userId))
     return res.status(400).send({ error: "Invalid user id" });
