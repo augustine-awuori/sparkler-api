@@ -1,7 +1,9 @@
 import express from "express";
 import bcrypt from "bcrypt";
+import mongoose from "mongoose";
 import _ from "lodash";
 import { StreamChat } from "stream-chat";
+import * as stream from "getstream";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import {
@@ -124,6 +126,22 @@ router.get("/", async (_req, res) => {
   const users = await User.find({});
 
   res.send(users);
+});
+
+router.get("/userFollowings", async (req, res) => {
+  const { userId } = req.body;
+
+  if (!mongoose.isValidObjectId(userId))
+    return res.status(400).send({ error: "Invalid user id" });
+
+  const client = stream.connect(process.env.feedApiKey, process.env.feedSecretKey, process.env.streamAppId);
+  if (!client) return res.status(500).send({ error: "Client couldn't be initialised" });
+
+  const response = await client?.feed("user", userId).followStats();
+
+  response
+    ? res.send(response)
+    : res.status(500).send({ error: "Could not fetch followings from Stream" });
 });
 
 router.get("/:username", async (req, res) => {
