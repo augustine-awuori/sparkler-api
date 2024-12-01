@@ -1,6 +1,8 @@
 import express from "express";
 import * as stream from "getstream";
 
+import auth from "../middlewares/auth";
+
 const router = express.Router();
 
 router.post("/resparkle", auth, async (req, res) => {
