@@ -12,6 +12,6 @@ export default (req, res, next) => {
     req.user = payload;
     next();
   } catch (err) {
-    res.status(400).send({ error: `Invalid token. User doesn't exist. ${error}` });
+    res.status(400).send({ error: `Invalid token. User doesn't exist. ${err}` });
   }
 };
