@@ -27,6 +27,9 @@ router.post("/resparkle", auth, async (req, res) => {
                 kind,
             });
 
+            if (response.results.length === 0)
+                return res.status(404).send({ error: "Reaction not found for the activity" });
+
             const reactionId = response.results[0].id;
             await client.reactions.delete(reactionId);
 
