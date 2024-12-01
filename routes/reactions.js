@@ -32,12 +32,14 @@ router.post("/resparkle", auth, async (req, res) => {
 
             res.send(response);
         } else {
-            await client.reactions.add(
+            const response = await client.reactions.add(
                 kind,
                 sparkleId,
                 { id: actorId },
                 { targetFeeds: getTargetFeeds(req.user._id !== actorId, hasResparkled) }
             );
+
+            res.send(response)
         }
     } catch (error) {
         res.status(500).send(error);
