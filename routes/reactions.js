@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.post("/resparkle", auth, async (req, res) => {
     try {
+        const { _id: userId } = req.user;
         const { hasResparkled, actorId, kind, sparkleId } = req.body;
 
         const client = stream.connect(
@@ -25,6 +26,7 @@ router.post("/resparkle", auth, async (req, res) => {
             const response = await client.reactions.filter({
                 activity_id: sparkleId,
                 kind,
+                user_id: userId
             });
 
             if (response.results.length === 0)
@@ -39,7 +41,7 @@ router.post("/resparkle", auth, async (req, res) => {
                 kind,
                 sparkleId,
                 { id: actorId },
-                { targetFeeds: getTargetFeeds(req.user._id !== actorId, hasResparkled) }
+                { targetFeeds: getTargetFeeds(req.user._id !== actorId, hasResparkled), userId, }
             );
 
             res.send(response)
