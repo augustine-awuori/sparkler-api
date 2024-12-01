@@ -34,7 +34,7 @@ router.post("/resparkle", auth, async (req, res) => {
         } else {
             await client.reactions.add(
                 kind,
-                { id: sparkleId },
+                sparkleId,
                 { id: actorId },
                 { targetFeeds: getTargetFeeds(req.user._id !== actorId, hasResparkled) }
             );
