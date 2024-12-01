@@ -41,7 +41,7 @@ router.post("/resparkle", auth, async (req, res) => {
                 kind,
                 sparkleId,
                 { id: actorId },
-                { targetFeeds: getTargetFeeds(req.user._id !== actorId, hasResparkled), userId, }
+                { targetFeeds: getTargetFeeds(req.user._id !== actorId, hasResparkled, actorId), userId, }
             );
 
             res.send(response)
@@ -51,7 +51,7 @@ router.post("/resparkle", auth, async (req, res) => {
     }
 });
 
-function getTargetFeeds(notActor, hasResparkled) {
+function getTargetFeeds(notActor, hasResparkled, actorId) {
     const feeds = [];
 
     if (!hasResparkled && notActor) feeds.push(`notification:${actorId}`);
