@@ -15,7 +15,11 @@ router.post("/resparkle", auth, async (req, res) => {
         if (!client)
             return res.status(500).send({ error: "Client couldn't be initialised" });
 
-        if (hasResparkled) {
+        if (
+            typeof hasResparkled === "string"
+                ? hasResparkled === "true"
+                : hasResparkled
+        ) {
             const response = await client.reactions.filter({
                 activity_id: sparkleId,
                 kind,
