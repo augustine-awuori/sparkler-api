@@ -5,10 +5,10 @@ import auth from "../middlewares/auth.js";
 
 const router = express.Router();
 
-router.post("/resparkle", auth, async (req, res) => {
+router.post("/toggle", auth, async (req, res) => {
     try {
         const { _id: userId } = req.user;
-        const { hasResparkled, actorId, kind, sparkleId } = req.body;
+        const { done, actorId, kind, sparkleId } = req.body;
 
         const client = stream.connect(
             process.env.feedApiKey,
@@ -18,19 +18,18 @@ router.post("/resparkle", auth, async (req, res) => {
         if (!client)
             return res.status(500).send({ error: "Client couldn't be initialised" });
 
-        if (
-            typeof hasResparkled === "string"
-                ? hasResparkled === "true"
-                : hasResparkled
-        ) {
+        const hasBeenDone = typeof done === "string" ? done === "true" : done;
+        if (hasBeenDone) {
             const response = await client.reactions.filter({
                 activity_id: sparkleId,
                 kind,
-                user_id: userId
+                user_id: userId,
             });
 
             if (response.results.length === 0)
-                return res.status(404).send({ error: "Reaction not found for the activity" });
+                return res
+                    .status(404)
+                    .send({ error: "Reaction not found for the activity" });
 
             const reactionId = response.results[0].id;
             await client.reactions.delete(reactionId);
@@ -41,10 +40,13 @@ router.post("/resparkle", auth, async (req, res) => {
                 kind,
                 sparkleId,
                 { id: actorId },
-                { targetFeeds: getTargetFeeds(req.user._id !== actorId, hasResparkled, actorId), userId, }
+                {
+                    targetFeeds: getTargetFeeds(req.user._id !== actorId, done, actorId),
+                    userId,
+                }
             );
 
-            res.send(response)
+            res.send(response);
         }
     } catch (error) {
         res.status(500).send(error);
