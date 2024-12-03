@@ -15,7 +15,7 @@ router.delete("/:sparkleId", auth, async (req, res) => {
             process.env.streamAppId
         );
 
-        const userFeed = await client.feed("user", req.user._id.toString());
+        const userFeed = await client.feed("timeline", req.user._id.toString());
         res.send(await userFeed?.removeActivity(sparkleId));
     } catch (error) {
         res.status(500).send({ error: "Error deleting a sparkle" });
