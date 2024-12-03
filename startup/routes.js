@@ -7,6 +7,7 @@ import chatToken from "../routes/chatToken.js";
 import data from "../routes/data.js";
 import error from "../middlewares/error.js";
 import reactions from "../routes/reactions.js";
+import sparkles from "../routes/sparkles.js";
 import users from "../routes/users.js";
 
 export default function (app) {
@@ -18,5 +19,6 @@ export default function (app) {
   app.use("/api/data", data);
   app.use("/api/users", users);
   app.use("/api/reactions", reactions);
+  app.use("/api/sparkles", sparkles);
   app.use(error);
 }
