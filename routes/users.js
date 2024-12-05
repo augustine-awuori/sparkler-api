@@ -161,17 +161,17 @@ router.get("/:userId/sparkles", async (req, res) => {
       process.env.streamAppId
     );
 
-    const response = await client
-      ?.feed("user", userId)
-      .get({
-        enrich: true,
-        ownReactions: true,
-        withOwnChildren: true,
-        withOwnReactions: true,
-        withReactionCounts: true,
-        withRecentReactions: true,
-      });
-    res.send(response);
+    const response = await client?.feed("user", userId).get({
+      enrich: true,
+      ownReactions: true,
+      withOwnChildren: true,
+      withOwnReactions: true,
+      withReactionCounts: true,
+      withRecentReactions: true,
+    });
+    response
+      ? res.send(response.results)
+      : res.status(500).send({ error: "Something went wrong" });
   } catch (error) {
     res.send({ error: `Error fetching user's sparkles ${error}` });
   }
