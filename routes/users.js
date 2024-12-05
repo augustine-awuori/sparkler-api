@@ -155,6 +155,12 @@ router.get("/:userId/sparkles", async (req, res) => {
   if (!userId) return res.status(400).send({ error: "Invalid user id" });
 
   try {
+    const client = stream.connect(
+      process.env.feedApiKey,
+      process.env.feedSecretKey,
+      process.env.streamAppId
+    );
+
     const response = await client
       ?.feed("user", userId)
       .get({
