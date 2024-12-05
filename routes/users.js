@@ -149,6 +149,29 @@ router.get("/userFollowings/:userId", async (req, res) => {
     : res.status(500).send({ error: "Could not fetch followings from Stream" });
 });
 
+
+router.get("/:userId/followers", async (req, res) => {
+  const { userId } = req.params;
+
+  if (!userId) return res.status(400).send({ error: "Invalid user id" });
+
+  try {
+    const client = stream.connect(
+      process.env.feedApiKey,
+      process.env.feedSecretKey,
+      process.env.streamAppId
+    );
+
+    const response = await client?.feed("user", userId).followers();
+
+    response
+      ? res.send(response.results)
+      : res.status(500).send({ error: "Something went wrong" });
+  } catch (error) {
+    res.send({ error: `Error fetching user's sparkles ${error}` });
+  }
+});
+
 router.get("/:userId/sparkles", async (req, res) => {
   const { userId } = req.params;
 
