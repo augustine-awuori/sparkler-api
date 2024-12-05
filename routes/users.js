@@ -134,14 +134,41 @@ router.get("/userFollowings/:userId", async (req, res) => {
   if (!mongoose.isValidObjectId(userId))
     return res.status(400).send({ error: "Invalid user id" });
 
-  const client = stream.connect(process.env.feedApiKey, process.env.feedSecretKey, process.env.streamAppId);
-  if (!client) return res.status(500).send({ error: "Client couldn't be initialised" });
+  const client = stream.connect(
+    process.env.feedApiKey,
+    process.env.feedSecretKey,
+    process.env.streamAppId
+  );
+  if (!client)
+    return res.status(500).send({ error: "Client couldn't be initialized" });
 
-  const response = await client?.feed("user", userId).followStats();
+  const response = await client?.feed("user", userId).followStats({});
 
   response
     ? res.send(response)
     : res.status(500).send({ error: "Could not fetch followings from Stream" });
+});
+
+router.get("/:userId/sparkles", async (req, res) => {
+  const { userId } = req.params;
+
+  if (!userId) return res.status(400).send({ error: "Invalid user id" });
+
+  try {
+    const response = await client
+      ?.feed("user", userId)
+      .get({
+        enrich: true,
+        ownReactions: true,
+        withOwnChildren: true,
+        withOwnReactions: true,
+        withReactionCounts: true,
+        withRecentReactions: true,
+      });
+    res.send(response);
+  } catch (error) {
+    res.send({ error: `Error fetching user's sparkles ${error}` });
+  }
 });
 
 router.get("/:username", async (req, res) => {
