@@ -1,5 +1,6 @@
 import express from "express";
-import * as stream from "getstream";
+
+import { getClient } from "../utils/func.js";
 
 const router = express.Router();
 
@@ -37,12 +38,5 @@ router.get("/all", async (_req, res) => {
     }
 });
 
-function getClient() {
-    return stream.connect(
-        process.env.feedApiKey,
-        process.env.feedSecretKey,
-        process.env.streamAppId
-    );
-}
 
 export default router;

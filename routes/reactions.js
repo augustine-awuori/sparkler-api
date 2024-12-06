@@ -10,11 +10,7 @@ router.post("/toggle", auth, async (req, res) => {
         const { _id: userId } = req.user;
         const { done, actorId, kind, sparkleId } = req.body;
 
-        const client = stream.connect(
-            process.env.feedApiKey,
-            process.env.feedSecretKey,
-            process.env.streamAppId
-        );
+        const client = getClient();
         if (!client)
             return res.status(500).send({ error: "Client couldn't be initialised" });
 
@@ -59,6 +55,14 @@ function getTargetFeeds(notActor, hasResparkled, actorId) {
     if (!hasResparkled && notActor) feeds.push(`notification:${actorId}`);
 
     return feeds;
+}
+
+function getClient() {
+    return stream.connect(
+        process.env.feedApiKey,
+        process.env.feedSecretKey,
+        process.env.streamAppId
+    );
 }
 
 export default router;

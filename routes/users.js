@@ -3,9 +3,9 @@ import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import _ from "lodash";
 import { StreamChat } from "stream-chat";
-import * as stream from "getstream";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
+import { getClient } from "../utils/func.js";
 import {
   User,
   validateUser,
@@ -134,11 +134,7 @@ router.get("/userFollowings/:userId", async (req, res) => {
   if (!mongoose.isValidObjectId(userId))
     return res.status(400).send({ error: "Invalid user id" });
 
-  const client = stream.connect(
-    process.env.feedApiKey,
-    process.env.feedSecretKey,
-    process.env.streamAppId
-  );
+  const client = getClient();
   if (!client)
     return res.status(500).send({ error: "Client couldn't be initialized" });
 
@@ -155,11 +151,7 @@ router.get("/:userId/following", async (req, res) => {
   if (!userId) return res.status(400).send({ error: "Invalid user id" });
 
   try {
-    const client = stream.connect(
-      process.env.feedApiKey,
-      process.env.feedSecretKey,
-      process.env.streamAppId
-    );
+    const client = getClient();
 
     const response = await client?.feed("user", userId).following();
 
@@ -177,11 +169,7 @@ router.get("/:userId/followers", async (req, res) => {
   if (!userId) return res.status(400).send({ error: "Invalid user id" });
 
   try {
-    const client = stream.connect(
-      process.env.feedApiKey,
-      process.env.feedSecretKey,
-      process.env.streamAppId
-    );
+    const client = getClient();
 
     const response = await client?.feed("user", userId).followers();
 
@@ -199,11 +187,7 @@ router.get("/:userId/sparkles", async (req, res) => {
   if (!userId) return res.status(400).send({ error: "Invalid user id" });
 
   try {
-    const client = stream.connect(
-      process.env.feedApiKey,
-      process.env.feedSecretKey,
-      process.env.streamAppId
-    );
+    const client = getClient();
 
     const response = await client?.feed("user", userId).get({
       enrich: true,
@@ -213,6 +197,7 @@ router.get("/:userId/sparkles", async (req, res) => {
       withReactionCounts: true,
       withRecentReactions: true,
     });
+
     response
       ? res.send(response.results)
       : res.status(500).send({ error: "Something went wrong" });
