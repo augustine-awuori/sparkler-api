@@ -7,19 +7,20 @@ const router = express.Router();
 
 router.post("/add", auth, async (req, res) => {
   try {
-    const { actorId, sparkleId, kind } = req.body;
+    const { actorId, sparkleId, kind, data } = req.body;
     const userId = req.user._id.toString();
     const notifyActor = userId !== actorId;
     const targetFeeds = notifyActor ? getTargetFeeds(actorId) : [];
 
-    const { data, ok } = await addReaction({
+    const res = await addReaction({
       actorId,
       kind,
       sparkleId,
       targetFeeds,
       userId,
+      data,
     });
-    ok ? res.send(data) : res.status(500).send({ error: data });
+    res.ok ? res.send(res.data) : res.status(500).send({ error: res.data });
   } catch (error) {
     res.status(500).send({ error });
   }
@@ -81,7 +82,14 @@ function getClient() {
   );
 }
 
-async function addReaction({ kind, sparkleId, actorId, targetFeeds, userId }) {
+async function addReaction({
+  kind,
+  sparkleId,
+  actorId,
+  targetFeeds,
+  userId,
+  data = {},
+}) {
   try {
     const client = getClient();
     if (!client) return { ok: false, data: "Client not initialized" };
@@ -89,7 +97,7 @@ async function addReaction({ kind, sparkleId, actorId, targetFeeds, userId }) {
     const data = await client.reactions.add(
       kind,
       sparkleId,
-      { id: actorId },
+      { id: actorId, ...data },
       { targetFeeds, userId }
     );
     return { ok: true, data };
