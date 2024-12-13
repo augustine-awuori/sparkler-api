@@ -12,20 +12,26 @@ router.post("/add", auth, async (req, res) => {
     const notifyActor = userId !== actorId;
     const targetFeeds = notifyActor ? getTargetFeeds(actorId) : [];
 
-    const response = await addReaction({
-      actorId,
+    const client = getClient();
+    if (!client)
+      return res.status(500).send({ error: "Client is not initialized!" });
+
+    const response = await client.reactions.add(
       kind,
       sparkleId,
-      targetFeeds,
-      userId,
-      data,
-    });
+      { id: actorId, ...data },
+      { targetFeeds, userId }
+    );
 
-    response.ok
-      ? response.send(response.data)
-      : response.status(500).send({ error: response.data });
+    response
+      ? response.send(response)
+      : response
+        .status(500)
+        .send({ error: `Couldn't add a reaction: ${response.data}` });
   } catch (error) {
-    res.status(500).send({ error });
+    res
+      .status(500)
+      .send({ error: `The whole 'add reaction' operation failed: ${error}` });
   }
 });
 
