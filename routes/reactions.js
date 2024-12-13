@@ -7,27 +7,21 @@ const router = express.Router();
 
 router.post("/add", auth, async (req, res) => {
   try {
-    const { actorId, sparkleId, kind, data } = req.body;
+    const { actorId } = req.body;
     const userId = req.user._id.toString();
     const notifyActor = userId !== actorId;
-    const targetFeeds = notifyActor ? getTargetFeeds(actorId) : [];
 
-    const client = getClient();
-    if (!client)
-      return res.status(500).send({ error: "Client is not initialized!" });
+    const reaction = await addReaction({
+      ...req.body,
+      targetFeeds: notifyActor ? getTargetFeeds(actorId) : [],
+      userId,
+    });
 
-    const response = await client.reactions.add(
-      kind,
-      sparkleId,
-      { id: actorId, ...data },
-      { targetFeeds, userId }
-    );
-
-    response
-      ? response.send(response)
-      : response
-        .status(500)
-        .send({ error: `Couldn't add a reaction: ${response.data}` });
+    reaction.ok
+      ? res.send(reaction.data)
+      : res.status(500).send({
+          error: `Couldn't add a reaction: ${error} & ${reaction.data}`,
+        });
   } catch (error) {
     res
       .status(500)
@@ -63,19 +57,21 @@ router.post("/toggle", auth, async (req, res) => {
       res.send(response);
     } else {
       const notifyActor = userId !== actorId && !done;
-      const targetFeeds = notifyActor ? getTargetFeeds(actorId) : [];
 
       const { data, ok } = await addReaction({
-        actorId,
-        kind,
-        sparkleId,
-        targetFeeds,
+        ...req.body,
+        targetFeeds: notifyActor ? getTargetFeeds(actorId) : [],
         userId,
       });
-      ok ? res.send(data) : res.status(500).send({ error: data });
+
+      ok
+        ? res.send(data)
+        : res.status(500).send({ error: `Error toggling reaction: ${data}` });
     }
   } catch (error) {
-    res.status(500).send({ error });
+    res.status(500).send({
+      error: `The whole 'toggle reaction' operation failed: ${error}`,
+    });
   }
 });
 
@@ -103,13 +99,13 @@ async function addReaction({
     const client = getClient();
     if (!client) return { ok: false, data: "Client not initialized" };
 
-    const data = await client.reactions.add(
+    const resData = await client.reactions.add(
       kind,
       sparkleId,
       { id: actorId, ...data },
       { targetFeeds, userId }
     );
-    return { ok: true, data };
+    return { ok: true, data: resData };
   } catch (error) {
     return { ok: false, data: error };
   }
