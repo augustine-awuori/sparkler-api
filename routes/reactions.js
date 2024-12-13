@@ -20,7 +20,7 @@ router.post("/add", auth, async (req, res) => {
     reaction.ok
       ? res.send(reaction.data)
       : res.status(500).send({
-          error: `Couldn't add a reaction: ${error} & ${reaction.data}`,
+          error: `Couldn't add a reaction ${reaction.data}`,
         });
   } catch (error) {
     res
