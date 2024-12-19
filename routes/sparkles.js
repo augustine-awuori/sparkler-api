@@ -1,7 +1,7 @@
 import express from "express";
 import { nanoid } from "nanoid";
 
-import { getClient } from "../utils/func.js";
+import { addReaction, getClient, getTargetFeeds } from "../utils/func.js";
 import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 
@@ -36,9 +36,61 @@ router.post("/", auth, async (req, res) => {
             to: [...mentionsIdsTags, ...hashtagTags],
         });
 
-        sparkle ? res.send(sparkle) : res.status(500).send({ error: "Couldn't create the sparkle" })
+        sparkle
+            ? res.send(sparkle)
+            : res.status(500).send({ error: "Couldn't create the sparkle" });
     } catch (error) {
         res.status(500).send({ error: "Error creating a sparkle" });
+    }
+});
+
+router.post("/quote", auth, async (req, res) => {
+    try {
+        const client = getClient();
+        if (!client)
+            return res.status(500).send({ error: `Error initializing a client` });
+
+        const userId = req.user._id.toString();
+        const { images, text, quoted_activity } = req.body;
+        const actorId = quoted_activity.actor.id;
+        const notifyActor = userId !== actorId;
+        const verb = "quote";
+
+        await addReaction({
+            actorId,
+            kind: verb,
+            sparkleId: quoted_activity.id,
+            data: { id: userId, text },
+            targetFeeds: notifyActor ? getTargetFeeds(actorId) : [],
+        });
+
+        const collection = await client.collections.add(verb, nanoid(), {
+            text,
+        });
+
+        const time = getEATZone();
+        const userFeed = client.feed("user", userId);
+        const mentionsIdsTags = prepareMentionsIdsTags(
+            getUserIds(getMentions(text))
+        );
+        const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
+
+        const quote = await userFeed?.addActivity({
+            actor: `SU:${userId}`,
+            attachments: { images },
+            foreign_id: userId + time,
+            object: `SO:${verb}:${collection.id}`,
+            quoted_activity,
+            target: notifyActor ? actorId : undefined,
+            time,
+            to: [...mentionsIdsTags, ...hashtagTags],
+            verb,
+        });
+        quote
+            ? res.send(quote)
+            : res.status(500).send({ error: "Couldn't quoting the sparkle" });
+    } catch (error) {
+        res.status(500).send({ error: "Error quoting a sparkle" });
     }
 });
 
@@ -48,7 +100,7 @@ router.delete("/:sparkleId", auth, async (req, res) => {
 
         const client = getClient();
 
-        const userFeed = await client.feed("user", req.user._id.toString());
+        const userFeed = client.feed("user", req.user._id.toString());
         res.send(await userFeed?.removeActivity(sparkleId));
     } catch (error) {
         res.status(500).send({ error: "Error deleting a sparkle" });

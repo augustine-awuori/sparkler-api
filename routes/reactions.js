@@ -1,6 +1,6 @@
 import express from "express";
-import * as stream from "getstream";
 
+import { addReaction, getClient, getTargetFeeds } from "../utils/func.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -20,8 +20,8 @@ router.post("/add", auth, async (req, res) => {
     reaction.ok
       ? res.send(reaction.data)
       : res.status(500).send({
-          error: `Couldn't add a reaction ${reaction.data}`,
-        });
+        error: `Couldn't add a reaction ${reaction.data}`,
+      });
   } catch (error) {
     res
       .status(500)
@@ -75,40 +75,5 @@ router.post("/toggle", auth, async (req, res) => {
   }
 });
 
-function getTargetFeeds(actorId) {
-  return [`notification:${actorId}`];
-}
-
-function getClient() {
-  return stream.connect(
-    process.env.feedApiKey,
-    process.env.feedSecretKey,
-    process.env.streamAppId
-  );
-}
-
-async function addReaction({
-  kind,
-  sparkleId,
-  actorId,
-  targetFeeds,
-  userId,
-  data = {},
-}) {
-  try {
-    const client = getClient();
-    if (!client) return { ok: false, data: "Client not initialized" };
-
-    const resData = await client.reactions.add(
-      kind,
-      sparkleId,
-      { id: actorId, ...data },
-      { targetFeeds, userId }
-    );
-    return { ok: true, data: resData };
-  } catch (error) {
-    return { ok: false, data: error };
-  }
-}
 
 export default router;
