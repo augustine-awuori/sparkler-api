@@ -1,7 +1,7 @@
 import express from "express";
 import { nanoid } from "nanoid";
 
-import { addReaction, getClient, getTargetFeeds } from "../utils/func.js";
+import { getClient, getTargetFeeds, getEATZone } from "../utils/func.js";
 import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 
@@ -56,13 +56,12 @@ router.post("/quote", auth, async (req, res) => {
         const notifyActor = userId !== actorId;
         const verb = "quote";
 
-        await addReaction({
-            actorId,
-            kind: verb,
-            sparkleId: quoted_activity.id,
-            data: { id: userId, text },
-            targetFeeds: notifyActor ? getTargetFeeds(actorId) : [],
-        });
+        await client.reactions.add(
+            verb,
+            quoted_activity.id,
+            { id: userId, text, images },
+            { targetFeeds: notifyActor ? getTargetFeeds(actorId) : [], userId }
+        );
 
         const collection = await client.collections.add(verb, nanoid(), {
             text,
@@ -106,12 +105,6 @@ router.delete("/:sparkleId", auth, async (req, res) => {
         res.status(500).send({ error: "Error deleting a sparkle" });
     }
 });
-
-function getEATZone() {
-    const time = new Date();
-
-    return new Date(time.getTime() + 3 * 60 * 60 * 1000).toISOString();
-}
 
 function prepareMentionsIdsTags(mentionsIds = []) {
     return mentionsIds.length

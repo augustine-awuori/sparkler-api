@@ -35,3 +35,7 @@ export async function addReaction({
         return { ok: false, data: error };
     }
 }
+
+export function getEATZone() {
+    return new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString();
+}
