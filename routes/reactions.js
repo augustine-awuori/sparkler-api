@@ -1,11 +1,6 @@
 import express from "express";
 
-import {
-  addReaction,
-  getClient,
-  getTargetFeeds,
-  removeReaction,
-} from "../utils/func.js";
+import { addReaction, getTargetFeeds, removeReaction } from "../utils/func.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -16,16 +11,16 @@ router.post("/add", auth, async (req, res) => {
     const userId = req.user._id.toString();
     const notifyActor = userId !== actorId;
 
-    const reaction = await addReaction({
+    const { data, ok } = await addReaction({
       ...req.body,
       targetFeeds: notifyActor ? getTargetFeeds(actorId) : [],
       userId,
     });
 
-    reaction.ok
-      ? res.send(reaction.data)
+    ok
+      ? res.send(data)
       : res.status(500).send({
-        error: `Couldn't add a reaction ${reaction.data}`,
+        error: `Couldn't add a reaction ${data}`,
       });
   } catch (error) {
     res
@@ -50,27 +45,13 @@ router.post("/toggle", auth, async (req, res) => {
     const userId = req.user._id.toString();
     const { done, actorId, kind, sparkleId } = req.body;
 
-    const client = getClient();
-    if (!client)
-      return res.status(500).send({ error: "Client couldn't be initialized" });
+    const hasBeenReacted = typeof done === "string" ? done === "true" : done;
+    if (hasBeenReacted) {
+      const { data, ok } = await removeReaction({ kind, sparkleId, userId });
 
-    const hasBeenDone = typeof done === "string" ? done === "true" : done;
-    if (hasBeenDone) {
-      const response = await client.reactions.filter({
-        activity_id: sparkleId,
-        kind,
-        user_id: userId,
-      });
-
-      if (response.results.length === 0)
-        return res
-          .status(404)
-          .send({ error: "Reaction not found for the activity" });
-
-      const reactionId = response.results[0].id;
-      await client.reactions.delete(reactionId);
-
-      res.send(response);
+      ok
+        ? res.send(data)
+        : res.status(500).send({ error: data || "Something failed" });
     } else {
       const notifyActor = userId !== actorId && !done;
 
