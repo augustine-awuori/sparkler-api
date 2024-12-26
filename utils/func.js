@@ -39,3 +39,25 @@ export async function addReaction({
 export function getEATZone() {
     return new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString();
 }
+
+export async function removeReaction({ sparkleId, kind, userId }) {
+    try {
+        const client = getClient();
+        if (!client) return { ok: false, data: "Client not initialized" };
+
+        const response = await client.reactions.filter({
+            activity_id: sparkleId,
+            kind,
+            user_id: userId,
+        });
+        if (response.results.length === 0)
+            return { ok: false, data: "Reaction not found" };
+
+        const reactionId = response.results[0].id;
+        await client.reactions.delete(reactionId);
+
+        return { ok: true, data: response };
+    } catch (error) {
+        return { ok: false, data: error };
+    }
+}

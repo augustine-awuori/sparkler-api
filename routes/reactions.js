@@ -1,6 +1,11 @@
 import express from "express";
 
-import { addReaction, getClient, getTargetFeeds } from "../utils/func.js";
+import {
+  addReaction,
+  getClient,
+  getTargetFeeds,
+  removeReaction,
+} from "../utils/func.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -27,6 +32,17 @@ router.post("/add", auth, async (req, res) => {
       .status(500)
       .send({ error: `The whole 'add reaction' operation failed: ${error}` });
   }
+});
+
+router.post("/remove", auth, async (req, res) => {
+  const userId = req.user._id.toString();
+  const { kind, sparkleId } = req.body;
+
+  const { data, ok } = await removeReaction({ kind, sparkleId, userId });
+
+  ok
+    ? res.send(data)
+    : res.status(500).send({ error: data || "Something failed" });
 });
 
 router.post("/toggle", auth, async (req, res) => {
@@ -74,6 +90,5 @@ router.post("/toggle", auth, async (req, res) => {
     });
   }
 });
-
 
 export default router;
