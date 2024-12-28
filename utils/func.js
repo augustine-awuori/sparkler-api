@@ -40,6 +40,28 @@ export function getEATZone() {
     return new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString();
 }
 
+export async function getUserReactions({ kind, userId }) {
+    try {
+        const client = getClient();
+        if (!client) return { ok: false, data: "Client not initialized" };
+
+        const res = await client.reactions.filter({
+            kind,
+            with_activity_data: true,
+            with_own_children: true,
+            filter_user_id: userId,
+            user_id: userId,
+        });
+
+        return {
+            ok: !!res,
+            data: res || "Something failed while fetching reactions",
+        };
+    } catch (error) {
+        return { ok: false, data: error };
+    }
+}
+
 export async function removeReaction({ sparkleId, kind, userId }) {
     try {
         const client = getClient();

@@ -1,6 +1,11 @@
 import express from "express";
 
-import { addReaction, getTargetFeeds, removeReaction } from "../utils/func.js";
+import {
+  addReaction,
+  getTargetFeeds,
+  getUserReactions,
+  removeReaction,
+} from "../utils/func.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -70,6 +75,15 @@ router.post("/toggle", auth, async (req, res) => {
       error: `The whole 'toggle reaction' operation failed: ${error}`,
     });
   }
+});
+
+router.get("/:kind", auth, async (req, res) => {
+  const userId = req.user._id.toString();
+  const { kind } = req.params;
+
+  const { data, ok } = await getUserReactions({ kind, userId });
+
+  ok ? res.send(data) : res.status(500).send({ error: data });
 });
 
 export default router;
