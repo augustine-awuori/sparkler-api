@@ -64,6 +64,7 @@ router.post("/verify-auth-code", async (req, res) => {
             .send({ error: "Invalid username and/or authentication code." });
 
     user.authCode = "";
+    user.invalid = false;
     await user.save();
     res.send(user.generateAuthToken());
 });
