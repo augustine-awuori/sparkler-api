@@ -83,3 +83,7 @@ export async function removeReaction({ sparkleId, kind, userId }) {
         return { ok: false, data: error };
     }
 }
+
+export function getAuthCode() {
+    return Math.floor(1000 + Math.random() * 9000);
+}

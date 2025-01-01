@@ -3,6 +3,7 @@ import Joi from "joi";
 import jwt from "jsonwebtoken";
 
 const schema = new mongoose.Schema({
+    authCode: String,
     coverImage: String,
     profileImage: String,
     bio: String,
