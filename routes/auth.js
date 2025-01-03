@@ -45,7 +45,7 @@ router.post("/code", async (req, res) => {
     let user = await User.findOne({ email });
     const authCode = getAuthCode();
     const salt = await bcrypt.genSalt(10);
-    const hashedAuthCode = await bcrypt.hash(authCode, salt);
+    const hashedAuthCode = await bcrypt.hash(authCode.toString(), salt);
 
     if (!user) {
         const name = "Unknown";
