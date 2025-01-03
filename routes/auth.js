@@ -12,20 +12,23 @@ const router = express.Router();
 
 const validateDetails = (details) =>
     Joi.object({
+        authCode: Joi.number().min(4).required(),
         email: Joi.string().required(),
-        password: Joi.string().min(6).required(),
     }).validate(details);
 
 router.post("/", validator(validateDetails), async (req, res) => {
-    const { email, password } = req.body;
+    const { email, authCode } = req.body;
 
     const user = await User.findOne({ email });
     if (!user) return res.status(404).send({ error: "Email isn't registered." });
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    const isValidAuthCode = await bcrypt.compare(authCode, user.authCode);
 
-    return isValidPassword
-        ? res.send(user.generateAuthToken())
-        : res.status(400).send({ error: "Invalid username and/or password." });
+    if (!isValidAuthCode)
+        return res.status(400).send({ error: "Invalid username and/or auth code." });
+
+    user.authCode = "";
+    await user.save();
+    res.send(user.generateAuthToken());
 });
 
 router.post("/code", async (req, res) => {

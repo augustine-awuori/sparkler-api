@@ -5,8 +5,7 @@ import _ from "lodash";
 import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
-import { getAuthCode, getClient } from "../utils/func.js";
-import { sendMail } from "../services/mail.js";
+import { getClient } from "../utils/func.js";
 import {
   User,
   validateUser,
@@ -81,35 +80,6 @@ router.post(
       .send(_.omit(user.toObject(), ["password"]));
   }
 );
-
-router.post("/auth-code", async (req, res) => {
-  const { email } = req.body;
-
-  let user = await User.findOne({ email });
-  if (user) return res.status(400).send({ error: "Email is already taken" });
-
-  const name = "Unknown";
-  const username = await findUniqueUsername(name);
-  user = new User({ email, name, username, invalid: true });
-  const token = serverClient.createToken(user._id.toString());
-  user.feedToken = token;
-  user.chatToken = token;
-
-  const authCode = getAuthCode();
-  const salt = await bcrypt.genSalt(10);
-  user.authCode = await bcrypt.hash(authCode, salt);
-  await user.save();
-
-  const { accepted } = await sendMail({
-    message: `Your authentication code is: ${authCode} . It'll expire once you use it.`,
-    subject: "Your Access Code",
-    to: email,
-  });
-
-  accepted ?
-    res.send({ message: "Code has been sent to the email provided." })
-    : res.status(500).send({ error: 'Something failed while sending the auth code' });
-});
 
 router.patch("/followers", auth, async (req, res) => {
   try {
