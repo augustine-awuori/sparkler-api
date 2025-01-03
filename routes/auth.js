@@ -1,12 +1,18 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import Joi from "joi";
+import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername } from "../services/users.js";
 import { getAuthCode } from "../utils/func.js";
 import { sendMail } from "../services/mail.js";
 import { User } from "../models/user.js";
 import validator from "../middlewares/validate.js";
+
+const serverClient = StreamChat.getInstance(
+    process.env.chatApiKey,
+    process.env.chatApiSecret
+);
 
 const router = express.Router();
 
@@ -24,7 +30,9 @@ router.post("/", validator(validateDetails), async (req, res) => {
     const isValidAuthCode = await bcrypt.compare(authCode, user.authCode);
 
     if (!isValidAuthCode)
-        return res.status(400).send({ error: "Invalid username and/or auth code." });
+        return res
+            .status(400)
+            .send({ error: "Invalid username and/or auth code." });
 
     user.authCode = "";
     await user.save();
@@ -42,7 +50,15 @@ router.post("/code", async (req, res) => {
     if (!user) {
         const name = "Unknown";
         const username = await findUniqueUsername(name);
-        user = new User({ email, name, username, invalid: true });
+        const token = serverClient.createToken(user._id.toString());
+        user = new User({
+            email,
+            name,
+            username,
+            invalid: true,
+            feedToken: token,
+            chatToken: token,
+        });
     }
     user.authCode = hashedAuthCode;
     await user.save();

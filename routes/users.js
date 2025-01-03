@@ -22,25 +22,26 @@ const serverClient = StreamChat.getInstance(
 const router = express.Router();
 
 router.post("/", validate(validateUser), async (req, res) => {
-  const { email, name, password } = req.body;
+  const { email, name, authCode } = req.body;
 
-  let user = await User.findOne({ email });
-  if (user) return res.status(400).send({ error: "Email is already taken" });
+  const user = await User.findOne({ email });
+  if (!user) return res.status(400).send({ error: "Auth code isn't generated" });
 
-  const username = await findUniqueUsername(name);
-  user = new User({ email, name, username });
-  const token = serverClient.createToken(user._id.toString());
-  user.feedToken = token;
-  user.chatToken = token;
-  const salt = await bcrypt.genSalt(10);
-  user.password = await bcrypt.hash(password, salt);
-  await user.save();
+  const isValidAuthCode = await bcrypt.compare(authCode, user.authCode);
+  if (!isValidAuthCode)
+    return res.status(400).send({ error: "Invalid username and/or auth code." });
+
+  if (user.invalid) {
+    user.name = name;
+    user.username = await findUniqueUsername(name);
+    user.invalid = false;
+    await user.save();
+  }
 
   res
     .status(201)
     .header("x-auth-token", user.generateAuthToken())
     .header("access-control-expose-headers", "x-auth-token")
-    .send(_.omit(user, "password"));
 });
 
 router.post(
