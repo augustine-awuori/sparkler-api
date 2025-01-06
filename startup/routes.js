@@ -5,6 +5,7 @@ import serveStatic from "serve-static";
 import auth from "../routes/auth.js";
 import chatToken from "../routes/chatToken.js";
 import data from "../routes/data.js";
+import expoPushTokens from "../routes/expoPushTokens.js";
 import error from "../middlewares/error.js";
 import hashtags from "../routes/hashtags.js";
 import reactions from "../routes/reactions.js";
@@ -18,6 +19,7 @@ export default function (app) {
   app.use("/api/auth", auth);
   app.use("/api/chatToken", chatToken);
   app.use("/api/data", data);
+  app.use("/api/expoPushTokens", expoPushTokens);
   app.use("/api/users", users);
   app.use("/api/hashtags", hashtags);
   app.use("/api/reactions", reactions);

@@ -4,16 +4,17 @@ import jwt from "jsonwebtoken";
 
 const schema = new mongoose.Schema({
     authCode: String,
-    coverImage: String,
-    profileImage: String,
     bio: String,
+    coverImage: String,
     email: {
         type: String,
         required: true,
         unique: true,
     },
+    expoPushToken: String,
     followers: Object,
     following: Object,
+    profileImage: String,
     verified: {
         type: Boolean,
         default: false,
