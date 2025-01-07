@@ -154,7 +154,7 @@ router.get("/:userId/following", async (req, res) => {
   try {
     const client = getClient();
 
-    const response = await client?.feed("user", userId).following();
+    const response = await client?.feed("timeline", userId).following();
 
     response
       ? res.send(response.results)
@@ -242,6 +242,10 @@ router.patch("/", auth, async (req, res) => {
   const user = await User.findByIdAndUpdate(req.user._id, req.body, {
     new: true,
   });
+
+  const client = getClient();
+  if (client)
+    await client.currentUser.update({ ...user });
 
   if (!user)
     return res.status(404).send({ error: "User don't exist in the database" });
