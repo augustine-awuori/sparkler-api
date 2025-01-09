@@ -93,7 +93,7 @@ router.post("/quote", auth, async (req, res) => {
     }
 });
 
-router.get("/", auth, async (req, res) => {
+router.post("/get-sparkles-of-ids", auth, async (req, res) => {
     try {
         const { sparklesId } = req.body;
 
