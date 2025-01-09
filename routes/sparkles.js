@@ -93,6 +93,23 @@ router.post("/quote", auth, async (req, res) => {
     }
 });
 
+router.get("/", auth, async (req, res) => {
+    try {
+        const { sparklesId } = req.body;
+
+        const client = getClient();
+        if (!client)
+            return res.status(500).send({ error: `Error initializing a client` });
+
+        const sparkles = await client.getActivities({ ids: sparklesId });
+        sparkles
+            ? res.send(sparkles.results)
+            : res.status(500).send({ error: "Something failed getting sparkles" });
+    } catch (error) {
+        res.status(500).send({ error: "Error getting sparkles" });
+    }
+});
+
 router.delete("/:sparkleId", auth, async (req, res) => {
     try {
         const { sparkleId } = req.params;
