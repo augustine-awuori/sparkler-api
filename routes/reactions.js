@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   addReaction,
+  getClient,
   getTargetFeeds,
   getUserReactions,
   removeReaction,
@@ -82,8 +83,23 @@ router.get("/:kind", auth, async (req, res) => {
   const { kind } = req.params;
 
   const { data, ok } = await getUserReactions({ kind, userId });
+  if (!ok) return res.status(500).send({ error: data });
 
-  ok ? res.send(data) : res.status(500).send({ error: data });
+  const client = getClient();
+  if (!client) return res.status(500).send({ error: 'App error' });
+
+  const sparkles = await client.getActivities({
+    ids: [(data?.results || []).forEach((reaction) => reaction.activity_id)],
+    enrich: true,
+    ownReactions: true,
+    reactions: true,
+    withOwnChildren: true,
+    withOwnReactions: true,
+    withRecentReactions: true,
+    withReactionCounts: true,
+    withUserId: true,
+  });
+  res.send(sparkles);
 });
 
 export default router;
