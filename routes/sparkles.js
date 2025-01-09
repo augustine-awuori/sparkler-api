@@ -101,7 +101,17 @@ router.get("/", auth, async (req, res) => {
         if (!client)
             return res.status(500).send({ error: `Error initializing a client` });
 
-        const sparkles = await client.getActivities({ ids: sparklesId });
+        const sparkles = await client.getActivities({
+            ids: sparklesId,
+            enrich: true,
+            ownReactions: true,
+            reactions: true,
+            withOwnChildren: true,
+            withOwnReactions: true,
+            withUserId: true,
+            withReactionCounts: true,
+            withRecentReactions: true,
+        });
         sparkles
             ? res.send(sparkles.results)
             : res.status(500).send({ error: "Something failed getting sparkles" });
