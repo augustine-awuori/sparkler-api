@@ -11,7 +11,7 @@ const schema = new mongoose.Schema({
         required: true,
         unique: true,
     },
-    expoPushToken: String,
+    expoPushToken: Object,
     followers: Object,
     following: Object,
     profileImage: String,
