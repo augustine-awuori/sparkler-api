@@ -80,7 +80,7 @@ router.post("/quote", auth, async (req, res) => {
             foreign_id: userId + time,
             object: `SO:${verb}:${collection.id}`,
             quoted_activity,
-            target: notifyActor ? actorId : undefined,
+            target: notifyActor ? actorId : `timeline:${userId}`,
             time,
             to: [...mentionsIdsTags, ...hashtagTags],
             verb,
