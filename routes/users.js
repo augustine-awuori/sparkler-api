@@ -25,11 +25,14 @@ router.post("/", validate(validateUser), async (req, res) => {
   const { email, name, authCode } = req.body;
 
   const user = await User.findOne({ email });
-  if (!user) return res.status(400).send({ error: "Auth code isn't generated" });
+  if (!user)
+    return res.status(400).send({ error: "Auth code isn't generated" });
 
   const isValidAuthCode = await bcrypt.compare(authCode, user.authCode);
   if (!isValidAuthCode)
-    return res.status(400).send({ error: "Invalid username and/or auth code." });
+    return res
+      .status(400)
+      .send({ error: "Invalid username and/or auth code." });
 
   if (user.invalid) {
     user.name = name;
@@ -38,10 +41,14 @@ router.post("/", validate(validateUser), async (req, res) => {
     await user.save();
   }
 
+  const client = getClient();
+  if (client)
+    await client.currentUser.create({ id: user._id.toString(), ...user });
+
   res
     .status(201)
     .header("x-auth-token", user.generateAuthToken())
-    .header("access-control-expose-headers", "x-auth-token")
+    .header("access-control-expose-headers", "x-auth-token");
 });
 
 router.post(
@@ -244,8 +251,7 @@ router.patch("/", auth, async (req, res) => {
   });
 
   const client = getClient();
-  if (client)
-    await client.currentUser.update({ ...user });
+  if (client) await client.currentUser.update({ ...user });
 
   if (!user)
     return res.status(404).send({ error: "User don't exist in the database" });
