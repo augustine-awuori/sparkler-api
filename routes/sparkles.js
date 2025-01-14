@@ -133,19 +133,19 @@ router.delete("/:sparkleId", auth, async (req, res) => {
     }
 });
 
-function prepareMentionsIdsTags(mentionsIds = []) {
+export function prepareMentionsIdsTags(mentionsIds = []) {
     return mentionsIds.length
         ? mentionsIds.map((id) => `notification:${id}`)
         : [];
 }
 
-async function getUserIds(usernames) {
+export async function getUserIds(usernames) {
     const users = await User.find({ username: { $in: usernames } });
 
     return users.map((user) => user._id.toString());
 }
 
-function getMentions(text = "") {
+export function getMentions(text = "") {
     const mentionPattern = /@(\w+)/g;
     let match;
     const mentions = [];
@@ -157,7 +157,7 @@ function getMentions(text = "") {
     return mentions;
 }
 
-function getHashtags(text = "") {
+export function getHashtags(text = "") {
     const hashtagPattern = /#(\w+)/g;
     let match;
     const hashtags = [];
@@ -169,7 +169,7 @@ function getHashtags(text = "") {
     return hashtags;
 }
 
-function prepareHashtagTags(hashtags = [], user) {
+export function prepareHashtagTags(hashtags = [], user) {
     if (!hashtags.length || !user) return [];
 
     const computed = [
