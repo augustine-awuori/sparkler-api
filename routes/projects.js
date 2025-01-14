@@ -9,6 +9,7 @@ import {
     prepareHashtagTags,
     prepareMentionsIdsTags,
 } from "./sparkles.js";
+import auth from "../middlewares/auth.js";
 
 const router = express.Router();
 const PROJECT_VERB = "project";
