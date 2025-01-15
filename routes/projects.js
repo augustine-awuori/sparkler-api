@@ -43,6 +43,7 @@ router.post("/", auth, async (req, res) => {
             verb: PROJECT_VERB,
             object: `SO:${PROJECT_VERB}:${collection.id}`,
             foreign_id: userId + time,
+            target: `timeline:${userId}`,
             time,
             to: [...mentionsIdsTags, ...hashtagTags],
         });

@@ -40,6 +40,7 @@ router.post("/", auth, async (req, res) => {
             attachments: { images },
             object: `SO:${SPARKLE_VERB}:${collection.id}`,
             foreign_id: userId + time,
+            target: `timeline:${userId}`,
             time,
             to: [...mentionsIdsTags, ...hashtagTags],
         });
