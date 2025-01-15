@@ -1,5 +1,7 @@
 import * as stream from "getstream";
 
+import { User } from "../models/user.js";
+
 export function getClient() {
     return stream.connect(
         process.env.feedApiKey,
@@ -86,4 +88,53 @@ export async function removeReaction({ sparkleId, kind, userId }) {
 
 export function getAuthCode() {
     return Math.floor(1000 + Math.random() * 9000);
+}
+
+export function getHashtags(text = "") {
+    const hashtagPattern = /#(\w+)/g;
+    let match;
+    const hashtags = [];
+
+    while ((match = hashtagPattern.exec(text)) !== null) {
+        hashtags.push(match[1]);
+    }
+
+    return hashtags;
+}
+
+export function prepareHashtagTags(hashtags = [], user) {
+    if (!hashtags.length || !user) return [];
+
+    const computed = [
+        ...hashtags.map((tag) => `hashtags:${tag.toLowerCase()}`),
+        "hashtags:general",
+    ];
+
+    if (user.verified) computed.push("hashtags:verified");
+
+    return computed;
+}
+
+export function prepareMentionsIdsTags(mentionsIds = []) {
+    return mentionsIds.length
+        ? mentionsIds.map((id) => `notification:${id}`)
+        : [];
+}
+
+export async function getUserIds(usernames) {
+    const users = await User.find({ username: { $in: usernames } });
+
+    return users.map((user) => user._id.toString());
+}
+
+export function getMentions(text = "") {
+    const mentionPattern = /@(\w+)/g;
+    let match;
+    const mentions = [];
+
+    while ((match = mentionPattern.exec(text)) !== null) {
+        mentions.push(match[1]);
+    }
+
+    return mentions;
 }

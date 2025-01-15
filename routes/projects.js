@@ -1,14 +1,15 @@
 import express from "express";
 import { nanoid } from "nanoid";
 
-import { getClient, getEATZone } from "../utils/func.js";
 import {
+    getClient,
+    getEATZone,
     getHashtags,
     getMentions,
     getUserIds,
     prepareHashtagTags,
     prepareMentionsIdsTags,
-} from "./sparkles.js";
+} from "../utils/func.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();

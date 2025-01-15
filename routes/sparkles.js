@@ -1,8 +1,16 @@
 import express from "express";
 import { nanoid } from "nanoid";
 
-import { getClient, getTargetFeeds, getEATZone } from "../utils/func.js";
-import { User } from "../models/user.js";
+import {
+    getClient,
+    getEATZone,
+    getHashtags,
+    getMentions,
+    getTargetFeeds,
+    getUserIds,
+    prepareHashtagTags,
+    prepareMentionsIdsTags,
+} from "../utils/func.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -132,54 +140,5 @@ router.delete("/:sparkleId", auth, async (req, res) => {
         res.status(500).send({ error: "Error deleting a sparkle" });
     }
 });
-
-export function prepareMentionsIdsTags(mentionsIds = []) {
-    return mentionsIds.length
-        ? mentionsIds.map((id) => `notification:${id}`)
-        : [];
-}
-
-export async function getUserIds(usernames) {
-    const users = await User.find({ username: { $in: usernames } });
-
-    return users.map((user) => user._id.toString());
-}
-
-export function getMentions(text = "") {
-    const mentionPattern = /@(\w+)/g;
-    let match;
-    const mentions = [];
-
-    while ((match = mentionPattern.exec(text)) !== null) {
-        mentions.push(match[1]);
-    }
-
-    return mentions;
-}
-
-export function getHashtags(text = "") {
-    const hashtagPattern = /#(\w+)/g;
-    let match;
-    const hashtags = [];
-
-    while ((match = hashtagPattern.exec(text)) !== null) {
-        hashtags.push(match[1]);
-    }
-
-    return hashtags;
-}
-
-export function prepareHashtagTags(hashtags = [], user) {
-    if (!hashtags.length || !user) return [];
-
-    const computed = [
-        ...hashtags.map((tag) => `hashtags:${tag.toLowerCase()}`),
-        "hashtags:general",
-    ];
-
-    if (user.verified) computed.push("hashtags:verified");
-
-    return computed;
-}
 
 export default router;
