@@ -28,7 +28,7 @@ router.post("/", auth, async (req, res) => {
         });
         const time = getEATZone();
         const mentionsIdsTags = prepareMentionsIdsTags(
-            getUserIds(getMentions(text))
+            await getUserIds(getMentions(text))
         );
         const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
         const userId = req.user._id.toString();

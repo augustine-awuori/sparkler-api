@@ -26,17 +26,17 @@ router.post("/", auth, async (req, res) => {
         });
         const time = getEATZone();
         const mentionsIdsTags = prepareMentionsIdsTags(
-            getUserIds(getMentions(text))
+            await getUserIds(getMentions(text))
         );
         const { description, mention } = req.body;
         const hashtagTags = prepareHashtagTags(
-            getHashtags(description + mention),
+            getHashtags(`${description} ${mention} #project`),
             req.user
         );
         const userId = req.user._id.toString();
         const userFeed = client.feed("user", userId);
 
-        const project = await userFeed.addActivity({
+        const project = await userFeed?.addActivity({
             actor: `SU:${userId}`,
             verb: PROJECT_VERB,
             object: `SO:${PROJECT_VERB}:${collection.id}`,
@@ -49,7 +49,7 @@ router.post("/", auth, async (req, res) => {
             ? res.send(project)
             : res.status(500).send({ error: "Couldn't create the project" });
     } catch (error) {
-        res.status(500).send({ error: "Error creating a project" });
+        res.status(500).send({ error: `Error creating a project ${error}` });
     }
 });
 
