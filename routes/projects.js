@@ -21,22 +21,24 @@ router.post("/", auth, async (req, res) => {
         if (!client)
             return res.status(500).send({ error: `Error initializing a client` });
 
-        const collection = await client.collections.add(PROJECT_VERB, nanoid(), {
-            ...req.body,
-        });
+        const { description, mention } = req.body;
+
+        const collection = await client.collections.add(
+            PROJECT_VERB,
+            nanoid(),
+            req.body
+        );
         const time = getEATZone();
         const mentionsIdsTags = prepareMentionsIdsTags(
-            await getUserIds(getMentions(text))
+            await getUserIds(getMentions(mention))
         );
-        const { description, mention } = req.body;
         const hashtagTags = prepareHashtagTags(
             getHashtags(`${description} ${mention} #project`),
             req.user
         );
         const userId = req.user._id.toString();
-        const userFeed = client.feed("user", userId);
 
-        const project = await userFeed?.addActivity({
+        const project = await client.feed("user", userId)?.addActivity({
             actor: `SU:${userId}`,
             verb: PROJECT_VERB,
             object: `SO:${PROJECT_VERB}:${collection.id}`,
