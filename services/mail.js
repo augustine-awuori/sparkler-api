@@ -2,11 +2,9 @@ import nodemailer from "nodemailer";
 import Mailgen from "mailgen";
 
 const transporter = nodemailer.createTransport({
-    host: "live.smtp.mailtrap.io",
-    port: 587,
-    secure: false,
+    service: "gmail",
     auth: {
-        user: "api",
+        user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
 });
@@ -17,15 +15,15 @@ function generateHTMLEmail({ message }) {
         product: {
             name: "Sparkler",
             link: "https://sparkler.lol/",
-            logo: '',
+            logo: "",
         },
     });
 
     return mailGenerator.generate({
         body: {
-            name: 'Sparkler',
+            name: "Sparkler",
             intro: message,
-            outro: `Connect with ease!`,
+            outro: "Connect with ease!",
         },
     });
 }
@@ -34,7 +32,7 @@ export async function sendMail({ message, to, subject }) {
     const htmlEmail = generateHTMLEmail({ message });
 
     return await transporter.sendMail({
-        from: "Sparkler@demomailtrap.com",
+        from: `"Sparkler" ${process.env.EMAIL_USER}`,
         to,
         subject,
         text: htmlEmail ? "" : `Hello Sparkler, ${message}`,
