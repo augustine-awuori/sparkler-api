@@ -59,8 +59,8 @@ router.post("/code", async (req, res) => {
     await user.save();
 
     const { accepted } = await sendMail({
-        message: `Your authentication code is: ${authCode} . It'll expire once you use it.`,
-        subject: "Your Access Code",
+        message: `Your one time authentication code is: ${authCode}`,
+        subject: "Your Auth Access Code",
         to: email,
     });
 
