@@ -89,6 +89,19 @@ router.post(
   }
 );
 
+router.post('/follow', auth, async (req, res) => {
+  const { isFollowing, userId } = req.body;
+
+  const client = getClient();
+  if (!client) return res.status(500).send({ error: 'Error initializing client' });
+
+  const timelineFeed = client?.feed('timeline', req.user._id.toString());
+  const action = isFollowing ? "unfollow" : 'follow';
+  await timelineFeed?.[action]('user', userId);
+
+  res.status(201).send();
+});
+
 router.patch("/followers", auth, async (req, res) => {
   try {
     const { leaderId } = req.body;
