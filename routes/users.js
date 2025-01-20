@@ -269,7 +269,7 @@ router.patch("/", auth, async (req, res) => {
   });
 
   const client = getClient();
-  if (client) await client.currentUser.update({ ...user });
+  if (client) await client?.currentUser?.update({ ...user });
 
   if (!user)
     return res.status(404).send({ error: "User don't exist in the database" });
