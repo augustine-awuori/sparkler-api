@@ -39,11 +39,11 @@ router.post("/", validate(validateUser), async (req, res) => {
     user.username = await findUniqueUsername(name);
     user.invalid = false;
     await user.save();
-  }
 
-  const client = getClient();
-  if (client)
-    await client.currentUser.create({ id: user._id.toString(), ...user });
+    const client = getClient();
+    if (client)
+      await client.currentUser.create({ id: user._id.toString(), ...user });
+  }
 
   res
     .status(201)
