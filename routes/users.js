@@ -38,6 +38,7 @@ router.post("/", validate(validateUser), async (req, res) => {
     user.name = name;
     user.username = await findUniqueUsername(name);
     user.invalid = false;
+    user.authCode = '';
     await user.save();
 
     const client = getClient();
