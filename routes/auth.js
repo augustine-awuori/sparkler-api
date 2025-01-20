@@ -50,7 +50,7 @@ router.post("/code", async (req, res) => {
     if (!user) {
         const name = "Unknown";
         const username = await findUniqueUsername(name);
-        user = new User({ email, name, username, invalid: true, });
+        user = new User({ email, name, username });
         const token = serverClient.createToken(user._id.toString());
         user.feedToken = token;
         user.chatToken = token;
@@ -60,7 +60,7 @@ router.post("/code", async (req, res) => {
 
     const { accepted } = await sendMail({
         message: `Your one time authentication code is: ${authCode}`,
-        subject: "Your Auth Access Code",
+        subject: "Sparkler Auth Code",
         to: email,
     });
 
