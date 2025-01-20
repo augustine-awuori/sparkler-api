@@ -44,6 +44,9 @@ router.post("/", validate(validateUser), async (req, res) => {
     const client = getClient();
     if (client)
       await client.currentUser.create({ id: user._id.toString(), ...user });
+  } else {
+    user.authCode = '';
+    await user.save();
   }
 
   const authToken = user.generateAuthToken();
