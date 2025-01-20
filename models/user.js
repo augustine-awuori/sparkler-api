@@ -35,7 +35,7 @@ const schema = new mongoose.Schema({
     },
     invalid: {
         type: Boolean,
-        default: false,
+        default: true,
     },
     timestamp: {
         type: Number,
