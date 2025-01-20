@@ -45,10 +45,12 @@ router.post("/", validate(validateUser), async (req, res) => {
       await client.currentUser.create({ id: user._id.toString(), ...user });
   }
 
+  const authToken = user.generateAuthToken();
   res
     .status(201)
-    .header("x-auth-token", user.generateAuthToken())
-    .header("access-control-expose-headers", "x-auth-token");
+    .header("x-auth-token", authToken)
+    .header("access-control-expose-headers", "x-auth-token")
+    .send(authToken);
 });
 
 router.post(
