@@ -28,7 +28,7 @@ router.post("/", validate(validateUser), async (req, res) => {
   if (!user)
     return res.status(400).send({ error: "Auth code isn't generated" });
 
-  const isValidAuthCode = await bcrypt.compare(authCode, user.authCode);
+  const isValidAuthCode = await bcrypt.compare(authCode.toString(), user.authCode);
   if (!isValidAuthCode)
     return res
       .status(400)
