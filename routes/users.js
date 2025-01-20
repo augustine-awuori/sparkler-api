@@ -85,7 +85,7 @@ router.post(
     res
       .header("x-auth-token", user.generateAuthToken())
       .header("access-control-expose-headers", "x-auth-token")
-      .send(_.omit(user.toObject(), ["password"]));
+      .send(user);
   }
 );
 
