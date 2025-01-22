@@ -5,7 +5,7 @@ import _ from "lodash";
 import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
-import { getClient } from "../utils/func.js";
+import { createOrGetUser, getClient } from "../utils/func.js";
 import {
   User,
   validateUser,
@@ -275,13 +275,13 @@ router.patch("/", auth, async (req, res) => {
     new: true,
   });
 
-  const client = getClient();
-  await client?.user(user._id.toString())?.update({ ...user });
+  const streamUser = await (await createOrGetUser(user))?.update({ ...user });
 
-  if (!user)
-    return res.status(404).send({ error: "User don't exist in the database" });
-
-  res.send(user);
+  streamUser
+    ? res.send(user)
+    : res
+      .status(500)
+      .send({ error: `Error updating user info: ${streamUser}` });
 });
 
 router.delete("/", auth, async (req, res) => {
