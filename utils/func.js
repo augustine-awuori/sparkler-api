@@ -138,3 +138,14 @@ export function getMentions(text = "") {
 
     return mentions;
 }
+
+export const createOrGetUser = (user) => {
+    const client = getClient();
+
+    if (!user || !client) return;
+
+    const userId = user._id.toString();
+    return client
+        ?.user(userId)
+        ?.create({ id: userId, ...user }, { get_or_create: true });
+};

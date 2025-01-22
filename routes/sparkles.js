@@ -2,6 +2,7 @@ import express from "express";
 import { nanoid } from "nanoid";
 
 import {
+    createOrGetUser,
     getClient,
     getEATZone,
     getHashtags,
@@ -21,6 +22,8 @@ router.post("/", auth, async (req, res) => {
         const client = getClient();
         if (!client)
             return res.status(500).send({ error: `Error initializing a client` });
+
+        await createOrGetUser(req.user);
 
         const { text, images } = req.body;
         const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
@@ -58,6 +61,8 @@ router.post("/quote", auth, async (req, res) => {
         const client = getClient();
         if (!client)
             return res.status(500).send({ error: `Error initializing a client` });
+
+        await createOrGetUser(req.user);
 
         const userId = req.user._id.toString();
         const { images, text, quoted_activity } = req.body;
