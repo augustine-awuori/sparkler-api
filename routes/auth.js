@@ -26,16 +26,16 @@ router.post("/", validator(validateDetails), async (req, res) => {
     const { email, authCode } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).send({ error: "Email isn't registered." });
-    const isValidAuthCode = await bcrypt.compare(authCode.toString(), user.authCode);
+    // if (!user) return res.status(404).send({ error: "Email isn't registered." });
+    // const isValidAuthCode = await bcrypt.compare(authCode.toString(), user.authCode);
 
-    if (!isValidAuthCode)
-        return res
-            .status(400)
-            .send({ error: "Invalid username and/or auth code." });
+    // if (!isValidAuthCode)
+    //     return res
+    //         .status(400)
+    //         .send({ error: "Invalid username and/or auth code." });
 
-    user.authCode = "";
-    await user.save();
+    // user.authCode = "";
+    // await user.save();
     res.send(user.generateAuthToken());
 });
 
