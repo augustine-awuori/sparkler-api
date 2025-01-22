@@ -46,10 +46,10 @@ router.post("/", validate(validateUser), async (req, res) => {
 
     const client = getClient();
     const userId = user._id.toString();
-    if (client)
-      await client
-        .user(userId)
-        .create({ id: userId, ...user }, { get_or_create: true });
+
+    await client
+      ?.user(userId)
+      ?.create({ id: userId, ...user }, { get_or_create: true });
   } else {
     user.authCode = "";
     await user.save();
