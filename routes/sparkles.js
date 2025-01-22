@@ -89,7 +89,7 @@ router.post("/quote", auth, async (req, res) => {
             foreign_id: userId + time,
             object: `SO:${verb}:${collection.id}`,
             quoted_activity,
-            target: notifyActor ? `notification:${actorId}` : `timeline:${userId}`,
+            target: notifyActor ? `notification:${actorId}` : `user:${userId}`,
             time,
             to: [...mentionsIdsTags, ...hashtagTags],
             verb,
