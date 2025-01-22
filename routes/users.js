@@ -28,7 +28,10 @@ router.post("/", validate(validateUser), async (req, res) => {
   if (!user)
     return res.status(400).send({ error: "Auth code isn't generated" });
 
-  const isValidAuthCode = await bcrypt.compare(authCode.toString(), user.authCode);
+  const isValidAuthCode = await bcrypt.compare(
+    authCode.toString(),
+    user.authCode
+  );
   if (!isValidAuthCode)
     return res
       .status(400)
@@ -38,14 +41,17 @@ router.post("/", validate(validateUser), async (req, res) => {
     user.name = name;
     user.username = await findUniqueUsername(name);
     user.invalid = false;
-    user.authCode = '';
+    user.authCode = "";
     await user.save();
 
     const client = getClient();
+    const userId = user._id.toString();
     if (client)
-      await client.currentUser.create({ id: user._id.toString(), ...user });
+      await client
+        .user(userId)
+        .create({ id: userId, ...user }, { get_or_create: true });
   } else {
-    user.authCode = '';
+    user.authCode = "";
     await user.save();
   }
 
@@ -95,14 +101,15 @@ router.post(
   }
 );
 
-router.post('/follow', auth, async (req, res) => {
+router.post("/follow", auth, async (req, res) => {
   const { action, userId } = req.body;
 
   const client = getClient();
-  if (!client) return res.status(500).send({ error: 'Error initializing client' });
+  if (!client)
+    return res.status(500).send({ error: "Error initializing client" });
 
-  const timelineFeed = client?.feed('timeline', req.user._id.toString());
-  await timelineFeed?.[action]('user', userId);
+  const timelineFeed = client?.feed("timeline", req.user._id.toString());
+  await timelineFeed?.[action]("user", userId);
 
   res.status(201).send();
 });
