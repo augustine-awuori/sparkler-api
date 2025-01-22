@@ -144,8 +144,30 @@ export const createOrGetUser = (user) => {
 
     if (!user || !client) return;
 
-    const userId = user._id.toString();
+    const {
+        _id,
+        chatToken,
+        feedToken,
+        invalid,
+        name,
+        username,
+        verified,
+        email,
+    } = user;
+    const userId = _id.toString();
     return client
         ?.user(userId)
-        ?.create({ id: userId, ...user }, { get_or_create: true });
+        ?.create(
+            {
+                id: userId,
+                chatToken,
+                feedToken,
+                invalid,
+                name,
+                username,
+                verified,
+                email,
+            },
+            { get_or_create: true }
+        );
 };

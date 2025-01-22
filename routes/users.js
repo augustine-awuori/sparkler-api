@@ -44,12 +44,13 @@ router.post("/", validate(validateUser), async (req, res) => {
     user.authCode = "";
     await user.save();
 
-    const client = getClient();
-    const userId = user._id.toString();
-
-    await client
-      ?.user(userId)
-      ?.create({ id: userId, ...user }, { get_or_create: true });
+    const { chatToken, feedToken, invalid, name, username, verified, email } =
+      user;
+    await (
+      await createOrGetUser(user)
+    )?.update({
+      chatToken, feedToken, email, invalid, name, username, verified,
+    });
   } else {
     user.authCode = "";
     await user.save();
@@ -82,10 +83,7 @@ router.post(
         found = await User.findOne({ username });
       }
 
-      user = new User({
-        ...req.body,
-        username,
-      });
+      user = new User({ ...req.body, username, });
 
       const token = serverClient.createToken(user._id.toString());
       user.feedToken = token;
@@ -279,7 +277,7 @@ router.patch("/", auth, async (req, res) => {
     user;
   const streamUser = await (
     await createOrGetUser(user)
-  )?.update({ chatToken, feedToken, email, invalid, name, username, verified, });
+  )?.update({ chatToken, feedToken, email, invalid, name, username, verified });
 
   streamUser
     ? res.send(user)
