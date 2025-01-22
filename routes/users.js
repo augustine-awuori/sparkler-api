@@ -278,7 +278,7 @@ router.patch("/", auth, async (req, res) => {
   const streamUser = await (await createOrGetUser(user))?.update({ ...user });
 
   streamUser
-    ? res.send(streamUser)
+    ? res.send(streamUser.data)
     : res
       .status(500)
       .send({ error: `Error updating user info: ${streamUser}` });
