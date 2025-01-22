@@ -4,7 +4,7 @@ import Joi from "joi";
 import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername } from "../services/users.js";
-import { getAuthCode } from "../utils/func.js";
+import { createOrGetUser, getAuthCode } from "../utils/func.js";
 import { sendMail } from "../services/mail.js";
 import { User } from "../models/user.js";
 import validator from "../middlewares/validate.js";
@@ -33,6 +33,8 @@ router.post("/", validator(validateDetails), async (req, res) => {
         return res
             .status(400)
             .send({ error: "Invalid username and/or auth code." });
+
+    createOrGetUser(user);
 
     user.authCode = "";
     await user.save();
