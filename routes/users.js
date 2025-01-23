@@ -187,7 +187,10 @@ router.get("/userFollowings/:userId", async (req, res) => {
     ...response,
     results: {
       followers: { ...response.results.followers },
-      following: { count: followingRes?.results?.length || 0, feed: "" },
+      following: {
+        count: followingRes?.results?.length || 0,
+        feed: `user:${userId.toString()}`,
+      },
     },
   });
 });
