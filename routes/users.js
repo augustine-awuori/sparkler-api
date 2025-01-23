@@ -49,7 +49,13 @@ router.post("/", validate(validateUser), async (req, res) => {
     await (
       await createOrGetUser(user)
     )?.update({
-      chatToken, feedToken, email, invalid, name, username, verified,
+      chatToken,
+      feedToken,
+      email,
+      invalid,
+      name,
+      username,
+      verified,
     });
   } else {
     user.authCode = "";
@@ -83,7 +89,7 @@ router.post(
         found = await User.findOne({ username });
       }
 
-      user = new User({ ...req.body, username, });
+      user = new User({ ...req.body, username });
 
       const token = serverClient.createToken(user._id.toString());
       user.feedToken = token;
@@ -169,11 +175,19 @@ router.get("/userFollowings/:userId", async (req, res) => {
   if (!client)
     return res.status(500).send({ error: "Client couldn't be initialized" });
 
-  const response = await client?.feed("user", userId).followStats({});
+  let response = await client?.feed("user", userId).followStats({});
+  if (!response)
+    return res
+      .status(500)
+      .send({ error: "Could not fetch followings from Stream" });
 
-  response
-    ? res.send(response)
-    : res.status(500).send({ error: "Could not fetch followings from Stream" });
+  const followingRes = await client?.feed("timeline", userId).following();
+  const following = (followingRes?.results)?.length || 0;
+
+  res.send({
+    ...response,
+    results: { ...response.results.followers, following },
+  });
 });
 
 router.get("/:userId/following", async (req, res) => {
