@@ -52,7 +52,7 @@ router.post("/code", async (req, res) => {
     if (!user) {
         const name = "Unknown";
         const username = await findUniqueUsername(name);
-        user = new User({ email, name, username });
+        user = new User({ email, name, username, invalid: true });
         const token = serverClient.createToken(user._id.toString());
         user.feedToken = token;
         user.chatToken = token;
