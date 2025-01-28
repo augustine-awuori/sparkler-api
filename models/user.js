@@ -19,6 +19,10 @@ const schema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    isAdmin: {
+        type: Boolean,
+        default: false,
+    },
     username: {
         type: String,
         unique: true,
@@ -57,7 +61,8 @@ schema.methods.generateAuthToken = function () {
             name: this.name,
             profileImage: this.profileImage,
             username: this.username,
-            verified: this.verified
+            verified: this.verified,
+            isAdmin: this.isAdmin
         },
         process.env.jwtPrivateKey
     );
