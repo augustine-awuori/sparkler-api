@@ -44,8 +44,7 @@ router.post("/", validate(validateUser), async (req, res) => {
     user.authCode = "";
     await user.save();
 
-    const { chatToken, feedToken, invalid, name, username, verified, email } =
-      user;
+    const { chatToken, feedToken, invalid, username, verified, email } = user;
     await (
       await createOrGetUser(user)
     )?.update({
