@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   addReaction,
+  getClient,
   getTargetFeeds,
   getUserReactions,
   removeReaction,
@@ -77,6 +78,25 @@ router.post("/toggle", auth, async (req, res) => {
   }
 });
 
+router.get("/:kind/:activityId", async (req, res) => {
+  const { activityId, kind } = req.params;
+
+  const client = getClient();
+  if (!client)
+    return res.status(500).send({ error: "Could not initialized client" });
+
+  const reactionResponse = await client.reactions.filter({
+    kind,
+    with_activity_data: true,
+    with_own_children: true,
+    activity_id: activityId,
+  });
+
+  reactionResponse
+    ? res.send(reactionResponse)
+    : res.status(500).send({ error: "Could not get sparkle reactions" });
+});
+
 router.get("/:kind", auth, async (req, res) => {
   const userId = req.user._id.toString();
   const { kind } = req.params;
@@ -84,7 +104,7 @@ router.get("/:kind", auth, async (req, res) => {
   const { data, ok } = await getUserReactions({ kind, userId });
   if (!ok) return res.status(500).send({ error: data });
 
-  ok ? res.send(data) : res.status(500).send({ error: 'App error' });
+  ok ? res.send(data) : res.status(500).send({ error: "App error" });
 });
 
 export default router;
