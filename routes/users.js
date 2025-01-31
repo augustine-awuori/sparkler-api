@@ -291,11 +291,28 @@ router.patch("/", auth, async (req, res) => {
     new: true,
   });
 
-  const { chatToken, feedToken, invalid, name, username, verified, email } =
-    user;
+  const {
+    chatToken,
+    feedToken,
+    invalid,
+    name,
+    username,
+    verified,
+    email,
+    isAdmin,
+  } = user;
   const streamUser = await (
     await createOrGetUser(user)
-  )?.update({ chatToken, feedToken, email, invalid, name, username, verified });
+  )?.update({
+    chatToken,
+    feedToken,
+    email,
+    invalid,
+    name,
+    username,
+    verified,
+    isAdmin,
+  });
 
   streamUser
     ? res.send(user)
