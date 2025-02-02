@@ -50,11 +50,12 @@ router.post("/failed-login", [auth, admin], async (_req, res) => {
    Additionally, we have an update available on the Play Store with new features and improvements.
    Make sure to update your app for the best experience.
     `;
-    const { accepted } = await sendMail({ to: emails, message, subject });
+    // const { accepted } = await sendMail({ to: emails, message, subject });
 
-    accepted
-        ? res.send({ message: "Email sent" })
-        : res.status(500).send({ error: "Something failed while sending email" });
+    // accepted
+    //     ? res.send({ message: "Email sent" })
+    //     : res.status(500).send({ error: "Something failed while sending email" });
+    res.send(emails)
 });
 
 export default router;
