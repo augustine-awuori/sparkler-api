@@ -31,8 +31,8 @@ router.post("/:email", [auth, admin], async (req, res) => {
         : res.status(500).send({ error: "Something failed while sending email" });
 });
 
-router.post("/failed-login", [auth, admin], async (req, res) => {
-    const emails = (await User.find({ invalid: true }))
+router.post("/failed-login", [auth, admin], async (_req, res) => {
+    const emails = (await User.find({}))
         .filter((user) => user.authCode)
         .map((user) => user.email);
 
