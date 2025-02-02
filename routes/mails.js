@@ -20,10 +20,8 @@ router.post("/all", [auth, admin], async (req, res) => {
 
 router.post("/:email", [auth, admin], async (req, res) => {
     const { subject, message } = req.body;
+    const { email } = req.params;
 
-    const email = (await User.find({ email: req.params.email })).map(
-        (user) => user.email
-    );
     const { accepted } = await sendMail({ to: email, message, subject });
 
     accepted
