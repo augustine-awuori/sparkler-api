@@ -36,6 +36,9 @@ router.post("/failed-login", [auth, admin], async (_req, res) => {
         .filter((user) => user.authCode)
         .map((user) => user.email);
 
+    if (!emails.length)
+        return res.status(201).send({ message: "No incomplete registrations" });
+
     const subject =
         "Reminder: Use Your Sparkler Auth Code & App Update Available";
     const message = `
