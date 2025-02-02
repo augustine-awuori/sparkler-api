@@ -17,21 +17,9 @@ router.post("/all", [auth, admin], async (req, res) => {
         ? res.send({ message: "Email sent" })
         : res.status(500).send({ error: "Something failed while sending email" });
 });
-
-router.post("/:email", [auth, admin], async (req, res) => {
-    const { subject, message } = req.body;
-    const { email } = req.params;
-
-    const { accepted } = await sendMail({ to: email, message, subject });
-
-    accepted
-        ? res.send({ message: "Email sent" })
-        : res.status(500).send({ error: "Something failed while sending email" });
-});
-
 router.post("/failed-login", [auth, admin], async (_req, res) => {
     const emails = (await User.find({}))
-        .filter((user) => user.authCode)
+        .filter((user) => Boolean(user.authCode.length))
         .map((user) => user.email);
 
     if (!emails.length)
@@ -47,6 +35,17 @@ router.post("/failed-login", [auth, admin], async (_req, res) => {
     //     ? res.send({ message: "Email sent" })
     //     : res.status(500).send({ error: "Something failed while sending email" });
     res.send(emails);
+});
+
+router.post("/:email", [auth, admin], async (req, res) => {
+    const { subject, message } = req.body;
+    const { email } = req.params;
+
+    const { accepted } = await sendMail({ to: email, message, subject });
+
+    accepted
+        ? res.send({ message: "Email sent" })
+        : res.status(500).send({ error: "Something failed while sending email" });
 });
 
 export default router;
