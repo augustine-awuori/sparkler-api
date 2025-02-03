@@ -1,6 +1,7 @@
 import express from "express";
 
 import {
+  addChildReaction,
   addReaction,
   getClient,
   getTargetFeeds,
@@ -27,6 +28,32 @@ router.post("/add", auth, async (req, res) => {
       ? res.send(data)
       : res.status(500).send({
         error: `Couldn't add a reaction ${data}`,
+      });
+  } catch (error) {
+    res
+      .status(500)
+      .send({ error: `The whole 'add reaction' operation failed: ${error}` });
+  }
+});
+
+router.post("/addChild", auth, async (req, res) => {
+  try {
+    const { actorId, kind, parentId, data } = req.body;
+    const userId = req.user._id.toString();
+    const notifyActor = userId !== actorId;
+
+    const response = await addChildReaction({
+      targetFeeds: notifyActor ? getTargetFeeds(actorId) : [],
+      userId,
+      kind,
+      parentId,
+      data,
+    });
+
+    response.ok
+      ? res.send(response.data)
+      : res.status(500).send({
+        error: `Couldn't add a reaction ${response.data}`,
       });
   } catch (error) {
     res

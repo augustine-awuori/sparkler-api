@@ -14,6 +14,28 @@ export function getTargetFeeds(actorId) {
     return [`notification:${actorId}`];
 }
 
+export async function addChildReaction({
+    kind,
+    parentId,
+    data = {},
+    targetFeeds,
+    userId,
+}) {
+    try {
+        const client = getClient();
+        if (!client) return { ok: false, data: "Client not initialized" };
+
+        const resData = await client.reactions.addChild(kind, parentId, data, {
+            targetFeeds,
+            userId,
+        });
+
+        return { ok: true, data: resData };
+    } catch (error) {
+        return { ok: false, data: error };
+    }
+}
+
 export async function addReaction({
     kind,
     sparkleId,
@@ -155,19 +177,17 @@ export const createOrGetUser = (user) => {
         email,
     } = user;
     const userId = _id.toString();
-    return client
-        ?.user(userId)
-        ?.create(
-            {
-                id: userId,
-                chatToken,
-                feedToken,
-                invalid,
-                name,
-                username,
-                verified,
-                email,
-            },
-            { get_or_create: true }
-        );
+    return client?.user(userId)?.create(
+        {
+            id: userId,
+            chatToken,
+            feedToken,
+            invalid,
+            name,
+            username,
+            verified,
+            email,
+        },
+        { get_or_create: true }
+    );
 };
