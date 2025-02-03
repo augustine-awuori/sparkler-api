@@ -115,6 +115,8 @@ router.get("/:kind/:activityId", async (req, res) => {
   const reactionResponse = await client.reactions.filter({
     kind,
     activity_id: activityId,
+    with_activity_data: true,
+    with_own_children: true,
   });
 
   reactionResponse
