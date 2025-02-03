@@ -6,6 +6,7 @@ import {
   getClient,
   getTargetFeeds,
   getUserReactions,
+  removeChildReaction,
   removeReaction,
 } from "../utils/func.js";
 import auth from "../middlewares/auth.js";
@@ -60,6 +61,14 @@ router.post("/addChild", auth, async (req, res) => {
       .status(500)
       .send({ error: `The whole 'add reaction' operation failed: ${error}` });
   }
+});
+
+router.post('/removeChild', auth, async (req, res) => {
+  const { reactionId } = req.body;
+
+  const { ok } = await removeChildReaction(reactionId);
+
+  ok ? res.status(201).send() : res.status(500).send({ error: 'Something failed' })
 });
 
 router.post("/remove", auth, async (req, res) => {

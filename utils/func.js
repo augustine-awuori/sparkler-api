@@ -86,6 +86,18 @@ export async function getUserReactions({ kind, userId }) {
     }
 }
 
+export async function removeChildReaction(reactionId) {
+    try {
+        const client = getClient();
+        if (!client) return { ok: false, data: "Client not initialized" };
+
+        const response = await client.reactions.delete(reactionId);
+        return { ok: true, data: response };
+    } catch (error) {
+        return { ok: false, data: error };
+    }
+}
+
 export async function removeReaction({ sparkleId, kind, userId }) {
     try {
         const client = getClient();
