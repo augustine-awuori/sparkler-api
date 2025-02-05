@@ -63,12 +63,14 @@ router.post("/addChild", auth, async (req, res) => {
   }
 });
 
-router.post('/removeChild', auth, async (req, res) => {
+router.post("/removeChild", auth, async (req, res) => {
   const { reactionId } = req.body;
 
   const { ok } = await removeChildReaction(reactionId);
 
-  ok ? res.status(201).send() : res.status(500).send({ error: 'Something failed' })
+  ok
+    ? res.status(201).send()
+    : res.status(500).send({ error: "Something failed" });
 });
 
 router.post("/remove", auth, async (req, res) => {
@@ -112,6 +114,27 @@ router.post("/toggle", auth, async (req, res) => {
       error: `The whole 'toggle reaction' operation failed: ${error}`,
     });
   }
+});
+
+router.post("/", async (req, res) => {
+  const client = getClient();
+  if (!client)
+    return res.status(500).send({ error: "Could not initialized client" });
+
+  const { reactionsId } = req.body;
+  const reactions = [];
+
+  (reactionsId || []).forEach(async (id) => {
+    const reaction = await client.reactions.filter({
+      reaction_id: id,
+      with_activity_data: true,
+      with_own_children: true,
+    });
+
+    if (reaction) reactions.push(reaction);
+  });
+
+  res.send(reactions);
 });
 
 router.get("/:kind/:activityId", async (req, res) => {
