@@ -10,6 +10,8 @@ import {
     prepareHashtagTags,
     prepareMentionsIdsTags,
 } from "../utils/func.js";
+import { sendPushNotificationTo } from "./expoPushNotifications.js";
+import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -46,6 +48,15 @@ router.post("/", auth, async (req, res) => {
             target: `timeline:${userId}`,
             time,
             to: [...mentionsIdsTags, ...hashtagTags],
+        });
+
+        const tokens = (await User.find({})).map((user) => {
+            const token = user.expoPushToken?.data;
+            if (token && user._id.toString() !== userId) return token;
+        });
+        sendPushNotificationTo(tokens, {
+            message: description,
+            title: `${req.user.name} has a new project`,
         });
 
         project

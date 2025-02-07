@@ -18,11 +18,17 @@ router.post("/", auth, async (req, res) => {
         if (!targetUser) return;
 
         const { expoPushToken } = targetUser;
-        if (Expo.isExpoPushToken(expoPushToken?.data))
-            await sendPushNotification(expoPushToken?.data, { message, title });
+        sendPushNotificationTo([expoPushToken?.data], { message, title });
     });
 
     res.status(201).send();
 });
+
+export function sendPushNotificationTo(usersToken = [], { message, title }) {
+    usersToken.forEach(async (token) => {
+        if (Expo.isExpoPushToken(token))
+            await sendPushNotification(token, { message, title });
+    });
+}
 
 export default router;
