@@ -12,6 +12,7 @@ import {
   validateUserWithGoogleAccount,
 } from "../models/user.js";
 import auth from "../middlewares/auth.js";
+import admin from "../middlewares/admin.js";
 import validate from "../middlewares/validate.js";
 
 const serverClient = StreamChat.getInstance(
@@ -284,6 +285,19 @@ router.get("/profile/:username", async (req, res) => {
     ogImage: user.profileImage,
     ogUrl: `https://sparkler.lol/${user.username}`,
   });
+});
+
+router.patch('/sync', [auth, admin], async (_req, res) => {
+  (await User.find({})).forEach(async user => {
+    const { invalid, name, username, profileImage, coverImage } = user;
+
+    if (!invalid)
+      await (
+        await createOrGetUser(user)
+      )?.update({ name, username, profileImage, coverImage });
+  });
+
+  res.status(201).send();
 });
 
 router.patch("/", auth, async (req, res) => {
