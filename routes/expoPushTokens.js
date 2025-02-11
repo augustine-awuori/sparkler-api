@@ -13,10 +13,8 @@ router.post("/", auth, async (req, res) => {
     if (!user)
         return res.status(404).send({ error: "User does not exist in the DB" });
 
-    if (!user.expoPushToken) {
-        user.expoPushToken = token;
-        await user.save();
-    }
+    user.expoPushToken = token;
+    await user.save();
 
     res.status(201).send({ message: "Expo push token saved successfully" });
 });
