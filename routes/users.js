@@ -287,14 +287,29 @@ router.get("/profile/:username", async (req, res) => {
   });
 });
 
-router.patch('/sync', [auth, admin], async (_req, res) => {
-  (await User.find({})).forEach(async user => {
-    const { invalid, name, username, profileImage, coverImage } = user;
+router.patch("/sync", [auth, admin], async (_req, res) => {
+  (await User.find({})).forEach(async (user) => {
+    const {
+      invalid,
+      name,
+      username,
+      profileImage,
+      coverImage,
+      isAdmin,
+      verified,
+    } = user;
 
     if (!invalid)
       await (
         await createOrGetUser(user)
-      )?.update({ name, username, profileImage, coverImage });
+      )?.update({
+        name,
+        username,
+        profileImage,
+        coverImage,
+        isAdmin,
+        verified,
+      });
   });
 
   res.status(201).send();
@@ -310,10 +325,18 @@ router.patch("/", auth, async (req, res) => {
       .status(404)
       .send({ error: "User does not exist in the database" });
 
-  const { name, username, profileImage, coverImage } = user;
+  const { name, username, profileImage, coverImage, verified, isAdmin } = user;
   const streamUser = await (
     await createOrGetUser(user)
-  )?.update({ ...req.body, name, username, profileImage, coverImage });
+  )?.update({
+    ...req.body,
+    name,
+    username,
+    profileImage,
+    coverImage,
+    verified,
+    isAdmin,
+  });
 
   streamUser
     ? res.send(user)
