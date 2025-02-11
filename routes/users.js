@@ -291,9 +291,15 @@ router.patch("/", auth, async (req, res) => {
     new: true,
   });
 
+  if (!user)
+    return res
+      .status(404)
+      .send({ error: "User does not exist in the database" });
+
+  const { name, username, profileImage, coverImage } = user;
   const streamUser = await (
     await createOrGetUser(user)
-  )?.update({ ...req.body });
+  )?.update({ ...req.body, name, username, profileImage, coverImage });
 
   streamUser
     ? res.send(user)
