@@ -162,7 +162,11 @@ router.patch("/followers", auth, async (req, res) => {
 router.get("/", async (_req, res) => {
   const users = await User.find({});
 
-  res.send(users);
+  const sanitizedUsers = users.map((user) =>
+    _.omit(user.toObject(), ["expoPushToken", "chatToken", "feedToken"])
+  );
+
+  res.send(sanitizedUsers);
 });
 
 router.get("/userFollowings/:userId", async (req, res) => {
