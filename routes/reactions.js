@@ -166,4 +166,13 @@ router.get("/:kind", auth, async (req, res) => {
   ok ? res.send(data) : res.status(500).send({ error: "App error" });
 });
 
+router.get('/profile/:userId/:kind/', async (req, res) => {
+  const { kind, userId } = req.params;
+
+  const { data, ok } = await getUserReactions({ kind, userId });
+  if (!ok) return res.status(500).send({ error: data });
+
+  ok ? res.send(data) : res.status(500).send({ error: "App error" });
+});
+
 export default router;
