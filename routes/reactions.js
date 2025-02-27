@@ -188,7 +188,7 @@ router.get("/profile/:userId/:kind/", async (req, res) => {
     return { ...result, activity };
   });
 
-  res.send(mapped);
+  res.send(Promise.all(mapped));
 });
 
 export default router;
