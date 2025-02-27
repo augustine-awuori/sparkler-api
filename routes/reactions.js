@@ -172,23 +172,7 @@ router.get("/profile/:userId/:kind/", async (req, res) => {
   const { data, ok } = await getUserReactions({ kind, userId });
   if (!ok) return res.status(500).send({ error: data });
 
-  const mapped = (data.results || []).map(async (result) => {
-    const client = getClient();
-    if (!client) return result;
-
-    const activity = (
-      await client.getActivities({
-        enrich: true,
-        ids: [result.activity_id],
-        withReactionCounts: true,
-        withRecentReactions: true,
-      })
-    ).results[0];
-
-    return { ...result, activity };
-  });
-
-  res.send(Promise.all(mapped));
+  res.send(data.results);
 });
 
 export default router;
