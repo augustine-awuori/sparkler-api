@@ -28,11 +28,12 @@ const schema = new mongoose.Schema({
         unique: true,
     },
     feedToken: String,
+    chatToken: String,
     youtube: String,
     linkedIn: String,
     instagram: String,
     customLink: String,
-    chatToken: String,
+    communities: [String],
     name: {
         type: String,
         required: true,

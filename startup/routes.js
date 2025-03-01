@@ -4,6 +4,7 @@ import serveStatic from "serve-static";
 
 import auth from "../routes/auth.js";
 import chatToken from "../routes/chatToken.js";
+import communities from "../routes/communities.js";
 import data from "../routes/data.js";
 import error from "../middlewares/error.js";
 import expoPushNotifications from "../routes/expoPushNotifications.js";
@@ -22,6 +23,7 @@ export default function (app) {
   app.use(cors({ origin: "*" }));
   app.use("/api/auth", auth);
   app.use("/api/chatToken", chatToken);
+  app.use("/api/communities", communities);
   app.use("/api/data", data);
   app.use("/api/expoPushNotifications", expoPushNotifications);
   app.use("/api/expoPushTokens", expoPushTokens);
