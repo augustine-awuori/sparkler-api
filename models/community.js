@@ -11,7 +11,10 @@ export const Community = mongoose.model(
             required: true,
             trim: true,
         },
+        isVerified: { type: Boolean, default: false },
         bio: String,
+        profileImage: String,
+        coverImage: String,
         members: [String],
     })
 );
