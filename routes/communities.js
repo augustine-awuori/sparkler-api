@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 
 import { Community, validateCommunity } from "../models/community.js";
+import { getClient } from "../utils/func.js";
 import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import validate from "../middlewares/validate.js";
@@ -32,6 +33,26 @@ router.get("/:communityId", async (_req, res) => {
     community
         ? res.send(community)
         : res.status(404).send({ error: "Community not found!" });
+});
+
+router.get("/sparkles/:communityId", async (_req, res) => {
+    const client = getClient();
+    if (!client) return res.status(500).send({ error: 'Failed to initialize client' });
+
+    const response = await client
+        .feed("communities", req.params.communityId)
+        .get({
+            enrich: true,
+            ownReactions: true,
+            withOwnChildren: true,
+            withOwnReactions: true,
+            withRecentReactions: true,
+            withReactionCounts: true,
+        });
+
+    response
+        ? res.send(response)
+        : res.status(500).send({ error: "Error fetching community sparkles!" });
 });
 
 router.patch("/:communityId/addUser", auth, async (req, res) => {
