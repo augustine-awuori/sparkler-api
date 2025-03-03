@@ -26,6 +26,14 @@ router.get("/", async (_req, res) => {
     res.send(communities);
 });
 
+router.get("/:communityId", async (_req, res) => {
+    const community = await Community.findById(req.params.communityId);
+
+    community
+        ? res.send(community)
+        : res.status(404).send({ error: "Community not found!" });
+});
+
 router.patch("/:communityId/addUser", auth, async (req, res) => {
     const { communityId } = req.params;
     const userId = req.user._id;
