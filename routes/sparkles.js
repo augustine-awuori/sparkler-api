@@ -28,6 +28,7 @@ router.post("/", auth, async (req, res) => {
         const { text, images, communities } = req.body;
         const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
             text,
+            forCommunity: (communities || []).length > 0
         });
         const time = getEATZone();
         const mentionsIdsTags = prepareMentionsIdsTags(
