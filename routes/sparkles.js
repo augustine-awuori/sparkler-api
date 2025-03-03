@@ -25,7 +25,7 @@ router.post("/", auth, async (req, res) => {
 
         await createOrGetUser(req.user);
 
-        const { text, images } = req.body;
+        const { text, images, communities } = req.body;
         const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
             text,
         });
@@ -34,6 +34,7 @@ router.post("/", auth, async (req, res) => {
             await getUserIds(getMentions(text))
         );
         const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
+        const parsedCommunities = (communities || []).map(communityId => `communities:${communityId}`)
         const userId = req.user._id.toString();
         const userFeed = client.feed("user", userId);
 
@@ -45,7 +46,7 @@ router.post("/", auth, async (req, res) => {
             foreign_id: userId + time,
             target: `timeline:${userId}`,
             time,
-            to: [...mentionsIdsTags, ...hashtagTags],
+            to: [...mentionsIdsTags, ...hashtagTags, ...parsedCommunities],
         });
 
         sparkle
