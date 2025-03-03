@@ -55,7 +55,7 @@ router.get("/sparkles/:communityId", async (_req, res) => {
         : res.status(500).send({ error: "Error fetching community sparkles!" });
 });
 
-router.patch("/:communityId/addUser", auth, async (req, res) => {
+router.patch("/:communityId/join", auth, async (req, res) => {
     const { communityId } = req.params;
     const userId = req.user._id;
 
