@@ -51,7 +51,7 @@ router.get("/sparkles/:communityId", async (req, res) => {
         });
 
     response
-        ? res.send(response)
+        ? res.send(response.results)
         : res.status(500).send({ error: "Error fetching community sparkles!" });
 });
 
