@@ -27,6 +27,7 @@ router.post("/", validator(validateDetails), async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) return res.status(404).send({ error: "Email isn't registered." });
+    if (!user.authCode) return res.status(400).send({ error: 'Request a new auth code' })
     const isValidAuthCode = await bcrypt.compare(authCode.toString(), user.authCode);
 
     if (!isValidAuthCode)
