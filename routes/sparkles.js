@@ -29,7 +29,7 @@ router.post("/", auth, async (req, res) => {
         const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
             text,
             forCommunity: (communities || []).length > 0,
-            community: communities.length > 0 ? communities[0] : ''
+            community: (communities || []).length > 0 ? communities[0] : ''
         });
         const time = getEATZone();
         const mentionsIdsTags = prepareMentionsIdsTags(
