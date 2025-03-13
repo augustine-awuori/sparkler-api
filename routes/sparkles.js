@@ -29,10 +29,11 @@ router.post("/", auth, async (req, res) => {
         await createOrGetUser(req.user);
 
         const { text, images, communities } = req.body;
+        const forCommunity = (communities || []).length > 0;
         const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
             text,
-            forCommunity: (communities || []).length > 0,
-            community: (communities || []).length > 0 ? communities[0] : "",
+            forCommunity,
+            community: forCommunity ? communities[0] : "",
         });
         const time = getEATZone();
         const mentionsIdsTags = prepareMentionsIdsTags(
@@ -43,9 +44,8 @@ router.post("/", auth, async (req, res) => {
             (communityId) => `communities:${communityId}`
         );
         const userId = req.user._id.toString();
-        const userFeed = client.feed("user", userId);
 
-        const sparkle = await userFeed.addActivity({
+        const sparkle = await client.feed("user", userId).addActivity({
             actor: `SU:${userId}`,
             verb: SPARKLE_VERB,
             attachments: { images },
