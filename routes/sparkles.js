@@ -12,6 +12,7 @@ import {
     prepareHashtagTags,
     prepareMentionsIdsTags,
 } from "../utils/func.js";
+import { saveBug } from "./bugs.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -20,8 +21,10 @@ const SPARKLE_VERB = "sparkle";
 router.post("/", auth, async (req, res) => {
     try {
         const client = getClient();
-        if (!client)
+        if (!client) {
+            saveBug(`Error initializing client while creating a new sparkle`);
             return res.status(500).send({ error: `Error initializing a client` });
+        }
 
         await createOrGetUser(req.user);
 
@@ -29,14 +32,16 @@ router.post("/", auth, async (req, res) => {
         const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
             text,
             forCommunity: (communities || []).length > 0,
-            community: (communities || []).length > 0 ? communities[0] : ''
+            community: (communities || []).length > 0 ? communities[0] : "",
         });
         const time = getEATZone();
         const mentionsIdsTags = prepareMentionsIdsTags(
             await getUserIds(getMentions(text))
         );
         const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
-        const parsedCommunities = (communities || []).map(communityId => `communities:${communityId}`)
+        const parsedCommunities = (communities || []).map(
+            (communityId) => `communities:${communityId}`
+        );
         const userId = req.user._id.toString();
         const userFeed = client.feed("user", userId);
 
@@ -51,10 +56,12 @@ router.post("/", auth, async (req, res) => {
             to: [...mentionsIdsTags, ...hashtagTags, ...parsedCommunities],
         });
 
-        sparkle
-            ? res.send(sparkle)
-            : res.status(500).send({ error: "Couldn't create the sparkle" });
+        if (sparkle) return res.send(sparkle);
+
+        await saveBug(`Sparkle is falsy, couldn't create it: ${sparkle}`);
+        res.status(500).send({ error: "Couldn't create the sparkle" });
     } catch (error) {
+        saveBug(`Error catched while creating a sparkle ${error}`);
         res.status(500).send({ error: "Error creating a sparkle" });
     }
 });
@@ -62,8 +69,10 @@ router.post("/", auth, async (req, res) => {
 router.post("/quote", auth, async (req, res) => {
     try {
         const client = getClient();
-        if (!client)
+        if (!client) {
+            saveBug(`Error initializing a client while quoting a sparkle`);
             return res.status(500).send({ error: `Error initializing a client` });
+        }
 
         await createOrGetUser(req.user);
 
@@ -102,10 +111,13 @@ router.post("/quote", auth, async (req, res) => {
             to: [...mentionsIdsTags, ...hashtagTags],
             verb,
         });
-        quote
-            ? res.send(quote)
-            : res.status(500).send({ error: "Couldn't quoting the sparkle" });
+
+        if (quote) return res.send(quote);
+
+        saveBug(`Quote is falsy, couldn't create it: ${quote}`);
+        res.status(500).send({ error: "Couldn't quoting the sparkle" });
     } catch (error) {
+        saveBug(`Error catched while creating quoting a sparkle ${error}`);
         res.status(500).send({ error: "Error quoting a sparkle" });
     }
 });
@@ -115,8 +127,10 @@ router.post("/get-sparkles-of-ids", auth, async (req, res) => {
         const { sparklesId } = req.body;
 
         const client = getClient();
-        if (!client)
+        if (!client) {
+            saveBug(`Error getting sparkles of ids, client is falsy`);
             return res.status(500).send({ error: `Error initializing a client` });
+        }
 
         const sparkles = await client.getActivities({
             ids: sparklesId,
@@ -129,10 +143,13 @@ router.post("/get-sparkles-of-ids", auth, async (req, res) => {
             withReactionCounts: true,
             withRecentReactions: true,
         });
-        sparkles
-            ? res.send(sparkles.results)
-            : res.status(500).send({ error: "Something failed getting sparkles" });
+
+        if (sparkles) return res.send(sparkles.results);
+
+        saveBug(`Sparkles are falsy, couldn't retrieve them: ${sparkles}`);
+        res.status(500).send({ error: "Something failed getting sparkles" });
     } catch (error) {
+        saveBug(`Error catched while retrieving quotes ${error}`);
         res.status(500).send({ error: "Error getting sparkles" });
     }
 });
@@ -142,10 +159,15 @@ router.delete("/:sparkleId", auth, async (req, res) => {
         const { sparkleId } = req.params;
 
         const client = getClient();
+        if (!client) {
+            saveBug(`Error initializing client while trying to delete sparkles`);
+            return res.status(500).send({ error: `Error initializing a client` });
+        }
 
         const userFeed = client.feed("user", req.user._id.toString());
         res.send(await userFeed?.removeActivity(sparkleId));
     } catch (error) {
+        saveBug(`Error catched while deleting sparkles ${error}`);
         res.status(500).send({ error: "Error deleting a sparkle" });
     }
 });

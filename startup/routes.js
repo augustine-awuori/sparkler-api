@@ -3,6 +3,7 @@ import express from "express";
 import serveStatic from "serve-static";
 
 import auth from "../routes/auth.js";
+import bugs from "../routes/bugs.js";
 import chatToken from "../routes/chatToken.js";
 import communities from "../routes/communities.js";
 import data from "../routes/data.js";
@@ -22,6 +23,7 @@ export default function (app) {
   app.use(serveStatic("public", { acceptRanges: false }));
   app.use(cors({ origin: "*" }));
   app.use("/api/auth", auth);
+  app.use("/api/bugs", bugs);
   app.use("/api/chatToken", chatToken);
   app.use("/api/communities", communities);
   app.use("/api/data", data);
