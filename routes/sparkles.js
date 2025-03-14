@@ -41,8 +41,8 @@ router.post("/", auth, async (req, res) => {
         );
         const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
         const parsedCommunities = (communities || []).map(
-            (communityId) => `communities:${communityId}`
-        );
+            (communityId) => communityId ? `communities:${communityId}` : undefined
+        ).filter(tag => typeof tag === 'string');
         const userId = req.user._id.toString();
 
         const sparkle = await client.feed("user", userId).addActivity({
