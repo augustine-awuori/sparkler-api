@@ -12,6 +12,7 @@ import {
     prepareHashtagTags,
     prepareMentionsIdsTags,
 } from "../utils/func.js";
+import { notifyCommunityMembers } from "../utils/communities.js";
 import { saveBug } from "./bugs.js";
 import auth from "../middlewares/auth.js";
 
@@ -40,9 +41,11 @@ router.post("/", auth, async (req, res) => {
             await getUserIds(getMentions(text))
         );
         const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
-        const parsedCommunities = (communities || []).map(
-            (communityId) => communityId ? `communities:${communityId}` : undefined
-        ).filter(tag => typeof tag === 'string');
+        const parsedCommunities = (communities || [])
+            .map((communityId) =>
+                communityId ? `communities:${communityId}` : undefined
+            )
+            .filter((tag) => typeof tag === "string");
         const userId = req.user._id.toString();
 
         const sparkle = await client.feed("user", userId).addActivity({
@@ -56,7 +59,14 @@ router.post("/", auth, async (req, res) => {
             to: [...mentionsIdsTags, ...hashtagTags, ...parsedCommunities],
         });
 
-        if (sparkle) return res.send(sparkle);
+        if (sparkle) {
+            if (forCommunity)
+                await notifyCommunityMembers(communities[0], userId, {
+                    message: text || "",
+                    title: `${req.user.name} sparkled in your community`,
+                });
+            return res.send(sparkle);
+        }
 
         await saveBug(`Sparkle is falsy, couldn't create it: ${sparkle}`);
         res.status(500).send({ error: "Couldn't create the sparkle" });
