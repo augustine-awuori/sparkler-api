@@ -82,8 +82,8 @@ router.patch("/:communityId/join", auth, async (req, res) => {
             message: `${user.name} joined your community`,
             title: `New member`,
         });
-    user.communities.unshift(communityId);
-    user.save();
+    user.communities = Array.from(new Set(user.communities).add(communityId));
+    await user.save();
     community.members = Array.from(new Set(community.members).add(userId));
     await community.save();
 
