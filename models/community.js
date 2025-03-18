@@ -15,7 +15,7 @@ export const Community = mongoose.model(
         bio: String,
         profileImage: String,
         coverImage: String,
-        members: [String],
+        members: [{ type: mongoose.Types.ObjectId, ref: 'User' }]
     })
 );
 
