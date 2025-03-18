@@ -84,7 +84,7 @@ router.patch("/:communityId/join", auth, async (req, res) => {
         });
     user.communities.unshift(communityId);
     user.save();
-    community.members.unshift(userId);
+    community.members = Array.from(new Set(community.members).add(userId));
     await community.save();
 
     res.send(community);
