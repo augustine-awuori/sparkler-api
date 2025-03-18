@@ -5,6 +5,7 @@ import { Community, validateCommunity } from "../models/community.js";
 import { getClient } from "../utils/func.js";
 import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
+import sendPushNotification from "../utils/pushNotifications.js";
 import validate from "../middlewares/validate.js";
 
 const router = express.Router();
@@ -37,7 +38,8 @@ router.get("/:communityId", async (_req, res) => {
 
 router.get("/sparkles/:communityId", async (req, res) => {
     const client = getClient();
-    if (!client) return res.status(500).send({ error: 'Failed to initialize client' });
+    if (!client)
+        return res.status(500).send({ error: "Failed to initialize client" });
 
     const response = await client
         .feed("communities", req.params.communityId)
@@ -68,12 +70,18 @@ router.patch("/:communityId/join", auth, async (req, res) => {
             .status(404)
             .send({ error: "User does not exist in the database!" });
 
-    const community = await Community.findById(communityId);
+    const community = await Community.findById(communityId).populate("creator");
     if (!community)
         return res
             .status(404)
             .send({ error: "Community does not exist in the database!" });
 
+    const creatorExpoPushToken = community.creator?.expoPushToken?.data;
+    if (creatorExpoPushToken)
+        sendPushNotification(creatorExpoPushToken, {
+            message: `${user.name} joined your community`,
+            title: `New member`,
+        });
     user.communities.unshift(communityId);
     user.save();
     community.members.unshift(userId);
