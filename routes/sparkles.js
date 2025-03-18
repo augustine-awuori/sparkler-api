@@ -14,6 +14,7 @@ import {
 } from "../utils/func.js";
 import { notifyCommunityMembers } from "../utils/communities.js";
 import { saveBug } from "./bugs.js";
+import { sendPushNotificationTo } from "./expoPushNotifications.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -37,9 +38,8 @@ router.post("/", auth, async (req, res) => {
             community: forCommunity ? communities[0] : "",
         });
         const time = getEATZone();
-        const mentionsIdsTags = prepareMentionsIdsTags(
-            await getUserIds(getMentions(text))
-        );
+        const mentionsUserIds = await getUserIds(getMentions(text));
+        const mentionsIdsTags = prepareMentionsIdsTags(mentionsUserIds);
         const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
         const parsedCommunities = (communities || [])
             .map((communityId) =>
@@ -65,6 +65,10 @@ router.post("/", auth, async (req, res) => {
                     message: text || "",
                     title: `${req.user.name} sparkled in your community`,
                 });
+            sendPushNotificationTo(mentionsUserIds, {
+                message: text || "",
+                title: `${req.user.name} mentioned you`,
+            });
             return res.send(sparkle);
         }
 
