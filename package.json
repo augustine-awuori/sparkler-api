@@ -28,7 +28,9 @@
     "nanoid": "^5.0.9",
     "nodemailer": "^6.9.16",
     "nodemon": "^3.1.0",
+    "pdf-parse": "^1.1.1",
     "serve-static": "^1.15.0",
+    "serverless-http": "^3.2.0",
     "stream-chat": "^8.37.0",
     "winston": "^3.13.0",
     "winston-mongodb": "^5.1.1"
