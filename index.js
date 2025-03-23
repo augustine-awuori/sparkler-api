@@ -1,5 +1,4 @@
 import express from "express";
-import serverless from "serverless-http";
 
 import db from "./startup/db.js";
 import logger from "./startup/logging.js";
@@ -13,4 +12,9 @@ db();
 prod(app);
 routes(app);
 
-export default serverless(app);
+const port = process.env.PORT || 3000;
+const server = app.listen(port, () =>
+    console.log(`Server is listening on port ${port}`)
+);
+
+export default server;
