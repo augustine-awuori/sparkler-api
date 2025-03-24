@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
+import admin from "../middlewares/admin.js";
 import sendPushNotification from "../utils/pushNotifications.js";
 
 const router = express.Router();
@@ -20,6 +21,17 @@ router.post("/", auth, async (req, res) => {
         const { expoPushToken } = targetUser;
         sendPushNotificationTo([expoPushToken?.data], { message, title });
     });
+
+    res.status(201).send();
+});
+
+router.post("/all", [auth, admin], async (req, res) => {
+    const { message, title } = req.body;
+
+    const tokens = (await User.find({}))
+        .map((user) => user.expoPushToken?.data)
+        .filter((token) => typeof token === "string");
+    sendPushNotificationTo(tokens, { message, title });
 
     res.status(201).send();
 });
