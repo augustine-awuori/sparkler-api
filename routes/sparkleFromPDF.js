@@ -9,8 +9,8 @@ import auth from "../middlewares/auth.js";
 const router = express.Router();
 
 // Check environment variables (Railway-specific)
-const requiredEnvVars = ['NODE_ENV']; // Add your auth-related env vars here
-requiredEnvVars.forEach(varName => {
+const requiredEnvVars = ["NODE_ENV"]; // Add your auth-related env vars here
+requiredEnvVars.forEach((varName) => {
     if (!process.env[varName]) {
         console.error(`Missing environment variable: ${varName}`);
     }
@@ -41,9 +41,9 @@ function summarizeText(text = "", maxLength = 200) {
 
 router.post("/", [auth, upload.single("pdf")], async (req, res) => {
     try {
-        console.log('Processing PDF upload:', {
+        console.log("Processing PDF upload:", {
             userId: req.user?._id,
-            fileSize: req.file?.size
+            fileSize: req.file?.size,
         });
 
         if (!req.user?._id) {
@@ -64,12 +64,12 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
         const pdfParser = new PDFParser();
 
         const pdfData = await new Promise((resolve, reject) => {
-            pdfParser.on("pdfParser_dataError", err => reject(err));
-            pdfParser.on("pdfParser_dataReady", pdfData => resolve(pdfData));
+            pdfParser.on("pdfParser_dataError", (err) => reject(err));
+            pdfParser.on("pdfParser_dataReady", (pdfData) => resolve(pdfData));
             pdfParser.parseBuffer(pdfBuffer);
         });
 
-        const fullText = pdfParser.getRawTextContent(); // Get raw text content
+        const fullText = pdfParser.getRawTextContent();
         const paragraphs = fullText
             .split(/\n\s*\n/)
             .filter((p) => p.trim().length > 50);
@@ -87,7 +87,10 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
         await Promise.all(
             summarizedSections.map(async (section) => {
                 try {
-                    await postSparkle(userId, { text: section.summary });
+                    await postSparkle(userId, {
+                        text: section.summary,
+                        communities: req.body.communities || [],
+                    });
                 } catch (sparkleError) {
                     await saveBug(`Failed to post sparkle: ${sparkleError.message}`);
                 }
@@ -97,7 +100,7 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
         const response = {
             totalSections: summarizedSections.length,
             sections: summarizedSections,
-            totalPages: pdfData.formImage.Pages.length, // pdf2json uses Pages array
+            totalPages: pdfData.formImage.Pages.length,
             metadata: {
                 originalFileName: req.file.originalname,
                 fileSize: req.file.size,
@@ -107,7 +110,7 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
 
         res.status(200).json(response);
     } catch (error) {
-        console.error('PDF route error:', error);
+        console.error("PDF route error:", error);
         await saveBug(`PDF processing error: ${error.message}`);
         res.status(500).json({
             error: "Error processing PDF",
@@ -116,17 +119,17 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
     }
 });
 
-router.use((err, req, res, next) => {
+router.use(async (err, req, res, next) => {
     if (err instanceof multer.MulterError) {
-        console.error('Multer error:', err);
-        saveBug(err.message); // Consider awaiting if async
+        console.error("Multer error:", err);
+        await saveBug(err.message);
         return res.status(400).json({ error: err.message });
     }
-    console.error('Unexpected error:', err);
-    saveBug(`Unexpected error: ${err.message}`); // Consider awaiting if async
+    console.error("Unexpected error:", err);
+    await saveBug(`Unexpected error: ${err.message}`);
     res.status(500).json({
         error: "Internal server error",
-        details: err.message
+        details: err.message,
     });
 });
 
