@@ -29,7 +29,7 @@
     "nanoid": "^5.0.9",
     "nodemailer": "^6.9.16",
     "nodemon": "^3.1.0",
-    "pdf-parse": "^1.1.1",
+    "pdf2json": "^3.1.5",
     "serve-static": "^1.15.0",
     "stream-chat": "^8.37.0",
     "winston": "^3.13.0",

@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import pdfParse from "pdf-parse";
+import PDFParser from "pdf2json";
 
 import { postSparkle } from "./sparkles.js";
 import { saveBug } from "./bugs.js";
@@ -41,7 +41,6 @@ function summarizeText(text = "", maxLength = 200) {
 
 router.post("/", [auth, upload.single("pdf")], async (req, res) => {
     try {
-        // Log request start for Railway debugging
         console.log('Processing PDF upload:', {
             userId: req.user?._id,
             fileSize: req.file?.size
@@ -62,19 +61,15 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
         const userId = req.user._id.toString();
         const pdfBuffer = req.file.buffer;
 
-        // Add memory usage logging
-        const memoryBefore = process.memoryUsage().heapUsed / 1024 / 1024;
-        console.log(`Memory before PDF parse: ${memoryBefore.toFixed(2)} MB`);
+        const pdfParser = new PDFParser();
 
-        const pdfData = await pdfParse(pdfBuffer, {
-            // Ensure no file system operations
-            disableFileSystem: true
+        const pdfData = await new Promise((resolve, reject) => {
+            pdfParser.on("pdfParser_dataError", err => reject(err));
+            pdfParser.on("pdfParser_dataReady", pdfData => resolve(pdfData));
+            pdfParser.parseBuffer(pdfBuffer);
         });
 
-        const memoryAfter = process.memoryUsage().heapUsed / 1024 / 1024;
-        console.log(`Memory after PDF parse: ${memoryAfter.toFixed(2)} MB`);
-
-        const fullText = pdfData.text;
+        const fullText = pdfParser.getRawTextContent(); // Get raw text content
         const paragraphs = fullText
             .split(/\n\s*\n/)
             .filter((p) => p.trim().length > 50);
@@ -89,7 +84,6 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
             };
         });
 
-        // Wait for all sparkles with error handling
         await Promise.all(
             summarizedSections.map(async (section) => {
                 try {
@@ -103,7 +97,7 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
         const response = {
             totalSections: summarizedSections.length,
             sections: summarizedSections,
-            totalPages: pdfData.numpages,
+            totalPages: pdfData.formImage.Pages.length, // pdf2json uses Pages array
             metadata: {
                 originalFileName: req.file.originalname,
                 fileSize: req.file.size,
