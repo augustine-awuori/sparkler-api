@@ -8,9 +8,17 @@ import auth from "../middlewares/auth.js";
 
 const router = express.Router();
 
+// Check environment variables (Railway-specific)
+const requiredEnvVars = ['NODE_ENV']; // Add your auth-related env vars here
+requiredEnvVars.forEach(varName => {
+    if (!process.env[varName]) {
+        console.error(`Missing environment variable: ${varName}`);
+    }
+});
+
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: (req, file, cb) => {
         if (file.mimetype === "application/pdf") cb(null, true);
         else cb(new Error("Please upload a PDF file"), false);
@@ -22,34 +30,55 @@ function summarizeText(text = "", maxLength = 200) {
     let summary = "";
     let currentLength = 0;
 
-    for (let sentence of sentences)
+    for (let sentence of sentences) {
         if (currentLength + sentence.length <= maxLength) {
             summary += sentence.trim() + ". ";
             currentLength += sentence.length;
         } else break;
-
+    }
     return summary.trim();
 }
 
 router.post("/", [auth, upload.single("pdf")], async (req, res) => {
     try {
-        if (!req.file) {
-            const error = "No PDF file uploaded"
-            saveBug(error);
-            return res.status(400).send({ error });
+        // Log request start for Railway debugging
+        console.log('Processing PDF upload:', {
+            userId: req.user?._id,
+            fileSize: req.file?.size
+        });
+
+        if (!req.user?._id) {
+            const error = "User not authenticated";
+            await saveBug(error);
+            return res.status(401).json({ error });
         }
 
-        // Extract text from PDF
-        const pdfBuffer = req.file.buffer;
-        const pdfData = await pdfParse(pdfBuffer);
+        if (!req.file) {
+            const error = "No PDF file uploaded";
+            await saveBug(error);
+            return res.status(400).json({ error });
+        }
 
-        // Split text into rough sections (this is a simple approach)
+        const userId = req.user._id.toString();
+        const pdfBuffer = req.file.buffer;
+
+        // Add memory usage logging
+        const memoryBefore = process.memoryUsage().heapUsed / 1024 / 1024;
+        console.log(`Memory before PDF parse: ${memoryBefore.toFixed(2)} MB`);
+
+        const pdfData = await pdfParse(pdfBuffer, {
+            // Ensure no file system operations
+            disableFileSystem: true
+        });
+
+        const memoryAfter = process.memoryUsage().heapUsed / 1024 / 1024;
+        console.log(`Memory after PDF parse: ${memoryAfter.toFixed(2)} MB`);
+
         const fullText = pdfData.text;
         const paragraphs = fullText
             .split(/\n\s*\n/)
-            .filter((p) => p.trim().length > 50); // Filter out very short paragraphs
+            .filter((p) => p.trim().length > 50);
 
-        // Process sections and create summaries
         const summarizedSections = paragraphs.map((paragraph, index) => {
             const summary = summarizeText(paragraph);
             return {
@@ -59,6 +88,17 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
                 summaryLength: summary.length,
             };
         });
+
+        // Wait for all sparkles with error handling
+        await Promise.all(
+            summarizedSections.map(async (section) => {
+                try {
+                    await postSparkle(userId, { text: section.summary });
+                } catch (sparkleError) {
+                    await saveBug(`Failed to post sparkle: ${sparkleError.message}`);
+                }
+            })
+        );
 
         const response = {
             totalSections: summarizedSections.length,
@@ -71,14 +111,10 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
             },
         };
 
-        const userId = req.user._id.toString();
-        summarizedSections.forEach(
-            async (section) => await postSparkle(userId, { text: section.summary })
-        );
-
-        res.send(response);
+        res.status(200).json(response);
     } catch (error) {
-        saveBug(`"PDF processing error:" ${error}`);
+        console.error('PDF route error:', error);
+        await saveBug(`PDF processing error: ${error.message}`);
         res.status(500).json({
             error: "Error processing PDF",
             details: error.message,
@@ -88,10 +124,16 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
 
 router.use((err, req, res, next) => {
     if (err instanceof multer.MulterError) {
-        saveBug(err.message);
+        console.error('Multer error:', err);
+        saveBug(err.message); // Consider awaiting if async
         return res.status(400).json({ error: err.message });
     }
-    next(err);
+    console.error('Unexpected error:', err);
+    saveBug(`Unexpected error: ${err.message}`); // Consider awaiting if async
+    res.status(500).json({
+        error: "Internal server error",
+        details: err.message
+    });
 });
 
 export default router;
