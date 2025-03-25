@@ -15,6 +15,7 @@ import hashtags from "../routes/hashtags.js";
 import mails from "../routes/mails.js";
 import projects from "../routes/projects.js";
 import reactions from "../routes/reactions.js";
+import sparkleFromPDF from "../routes/sparkleFromPDF.js";
 import sparkles from "../routes/sparkles.js";
 import users from "../routes/users.js";
 
@@ -36,5 +37,6 @@ export default function (app) {
   app.use("/api/projects", projects);
   app.use("/api/reactions", reactions);
   app.use("/api/sparkles", sparkles);
+  app.use("/api/sparkleFromPDF", sparkleFromPDF);
   app.use(error);
 }

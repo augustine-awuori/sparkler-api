@@ -22,55 +22,12 @@ const SPARKLE_VERB = "sparkle";
 
 router.post("/", auth, async (req, res) => {
     try {
-        const client = getClient();
-        if (!client) {
-            saveBug(`Error initializing client while creating a new sparkle`);
-            return res.status(500).send({ error: `Error initializing a client` });
-        }
-
         await createOrGetUser(req.user);
 
-        const { text, images, communities } = req.body;
-        const forCommunity = (communities || []).length > 0;
-        const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
-            text,
-            forCommunity,
-            community: forCommunity ? communities[0] : "",
-        });
-        const time = getEATZone();
-        const mentionsUserIds = await getUserIds(getMentions(text));
-        const mentionsIdsTags = prepareMentionsIdsTags(mentionsUserIds);
-        const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
-        const parsedCommunities = (communities || [])
-            .map((communityId) =>
-                communityId ? `communities:${communityId}` : undefined
-            )
-            .filter((tag) => typeof tag === "string");
         const userId = req.user._id.toString();
+        const sparkle = await postSparkle(userId, req.body);
 
-        const sparkle = await client.feed("user", userId).addActivity({
-            actor: `SU:${userId}`,
-            verb: SPARKLE_VERB,
-            attachments: { images },
-            object: `SO:${SPARKLE_VERB}:${collection.id}`,
-            foreign_id: userId + time,
-            target: `timeline:${userId}`,
-            time,
-            to: [...mentionsIdsTags, ...hashtagTags, ...parsedCommunities],
-        });
-
-        if (sparkle) {
-            if (forCommunity)
-                await notifyCommunityMembers(communities[0], userId, {
-                    message: text || "",
-                    title: `${req.user.name} sparkled in your community`,
-                });
-            sendPushNotificationTo(mentionsUserIds, {
-                message: text || "",
-                title: `${req.user.name} mentioned you`,
-            });
-            return res.send(sparkle);
-        }
+        if (sparkle) return res.send(sparkle);
 
         await saveBug(`Sparkle is falsy, couldn't create it: ${sparkle}`);
         res.status(500).send({ error: "Couldn't create the sparkle" });
@@ -185,5 +142,54 @@ router.delete("/:sparkleId", auth, async (req, res) => {
         res.status(500).send({ error: "Error deleting a sparkle" });
     }
 });
+
+export async function postSparkle(userId, { text = "", communities = [], images = [] }) {
+    const client = getClient();
+
+    if (!userId || !client) {
+        if (!client) saveBug("Client is falsy while posting a sparkle");
+        return;
+    }
+
+    const forCommunity = communities.length > 0;
+    const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
+        text,
+        forCommunity,
+        community: forCommunity ? communities[0] : "",
+    });
+    const time = getEATZone();
+    const mentionsUserIds = await getUserIds(getMentions(text));
+    const mentionsIdsTags = prepareMentionsIdsTags(mentionsUserIds);
+    const hashtagTags = prepareHashtagTags(getHashtags(text), req.user);
+    const parsedCommunities = communities
+        .map((communityId) =>
+            communityId ? `communities:${communityId}` : undefined
+        )
+        .filter((tag) => typeof tag === "string");
+
+    const sparkle = await client.feed("user", userId).addActivity({
+        actor: `SU:${userId}`,
+        verb: SPARKLE_VERB,
+        attachments: { images },
+        object: `SO:${SPARKLE_VERB}:${collection.id}`,
+        foreign_id: userId + time,
+        target: `timeline:${userId}`,
+        time,
+        to: [...mentionsIdsTags, ...hashtagTags, ...parsedCommunities],
+    });
+
+    if (sparkle) {
+        if (forCommunity)
+            await notifyCommunityMembers(communities[0], userId, {
+                message: text || "",
+                title: `${req.user.name} sparkled in your community`,
+            });
+        sendPushNotificationTo(mentionsUserIds, {
+            message: text || "",
+            title: `${req.user.name} mentioned you`,
+        });
+        return sparkle;
+    }
+}
 
 export default router;
