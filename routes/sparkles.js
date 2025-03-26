@@ -24,8 +24,7 @@ router.post("/", auth, async (req, res) => {
     try {
         await createOrGetUser(req.user);
 
-        const userId = req.user._id.toString();
-        const sparkle = await postSparkle(userId, req.body);
+        const sparkle = await postSparkle(req.user, req.body);
 
         if (sparkle) return res.send(sparkle);
 
@@ -143,8 +142,9 @@ router.delete("/:sparkleId", auth, async (req, res) => {
     }
 });
 
-export async function postSparkle(userId, { text = "", communities = [], images = [] }) {
+export async function postSparkle(user, { text = "", communities = [], images = [] }) {
     const client = getClient();
+    const userId = user._id.toString();
 
     if (!userId || !client) {
         if (!client) saveBug("Client is falsy while posting a sparkle");
@@ -182,11 +182,11 @@ export async function postSparkle(userId, { text = "", communities = [], images 
         if (forCommunity)
             await notifyCommunityMembers(communities[0], userId, {
                 message: text || "",
-                title: `${req.user.name} sparkled in your community`,
+                title: `${user.name} sparkled in your community`,
             });
         sendPushNotificationTo(mentionsUserIds, {
             message: text || "",
-            title: `${req.user.name} mentioned you`,
+            title: `${user.name} mentioned you`,
         });
         return sparkle;
     }
