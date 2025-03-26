@@ -49,18 +49,16 @@ router.post("/", [upload.single("pdf"), auth], async (req, res) => {
         if (!req.user?._id) {
             const error = "User not authenticated";
             await saveBug(error);
-            return res.status(401).json({ error });
+            return res.status(401).send({ error });
         }
 
         if (!req.file) {
             const error = "No PDF file uploaded";
             await saveBug(error);
-            return res.status(400).json({ error });
+            return res.status(400).send({ error });
         }
 
-        const userId = req.user._id.toString();
         const pdfBuffer = req.file.buffer;
-
         const pdfParser = new PDFParser();
 
         const pdfData = await new Promise((resolve, reject) => {
@@ -70,6 +68,7 @@ router.post("/", [upload.single("pdf"), auth], async (req, res) => {
         });
 
         const fullText = pdfParser.getRawTextContent();
+        console.log("text ", fullText);
         const paragraphs = fullText
             .split(/\n\s*\n/)
             .filter((p) => p.trim().length > 50);
@@ -107,8 +106,8 @@ router.post("/", [upload.single("pdf"), auth], async (req, res) => {
                 processedAt: new Date().toISOString(),
             },
         };
-
-        res.status(200).json(response);
+        console.log("res ", response)
+        res.status(200).send(response);
     } catch (error) {
         console.error("PDF route error:", error);
         await saveBug(`PDF processing error: ${error.message}`);
@@ -119,7 +118,7 @@ router.post("/", [upload.single("pdf"), auth], async (req, res) => {
     }
 });
 
-router.use(async (err, req, res, next) => {
+router.use(async (err, req, res) => {
     if (err instanceof multer.MulterError) {
         console.error("Multer error:", err);
         await saveBug(err.message);
