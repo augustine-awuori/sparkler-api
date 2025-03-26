@@ -39,7 +39,7 @@ function summarizeText(text = "", maxLength = 200) {
     return summary.trim();
 }
 
-router.post("/", [auth, upload.single("pdf")], async (req, res) => {
+router.post("/", [upload.single("pdf"), auth], async (req, res) => {
     try {
         console.log("Processing PDF upload:", {
             userId: req.user?._id,
@@ -87,7 +87,7 @@ router.post("/", [auth, upload.single("pdf")], async (req, res) => {
         await Promise.all(
             summarizedSections.map(async (section) => {
                 try {
-                    await postSparkle(userId, {
+                    await postSparkle(req.user, {
                         text: section.summary,
                         communities: req.body.communities || [],
                     });
