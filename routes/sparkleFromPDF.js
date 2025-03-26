@@ -44,6 +44,7 @@ router.post("/", [upload.single("pdf"), auth], async (req, res) => {
         console.log("Processing PDF upload:", {
             userId: req.user?._id,
             fileSize: req.file?.size,
+            hasFile: Boolean(req.file)
         });
 
         if (!req.user?._id) {
