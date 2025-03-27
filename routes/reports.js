@@ -16,11 +16,7 @@ router.post("/", validate(validateReport), async (req, res) => {
 });
 
 router.patch("/seen/:reportId", auth, async (req, res) => {
-    const userId = req.user._id;
-    const user = await User.findById(userId);
-
-    const authorised = user.isAdmin || user.isSchOfficial;
-    if (!authorised)
+    if (!(await isAuthorised(req.user._id)))
         return res
             .status(403)
             .send({ error: "You are unauthorised for this access" });
@@ -37,27 +33,21 @@ router.patch("/seen/:reportId", auth, async (req, res) => {
 });
 
 router.get("/:id", auth, async (req, res) => {
-    const userId = req.user._id;
-    const user = await User.findById(userId);
+    if (await isAuthorised(req.user._id))
+        return res.send(await Report.findById(req.params.id));
 
-    const authorised = user.isAdmin || user.isSchOfficial;
-    if (authorised) return res.send(await Report.findById(req.params.id));
-
-    res
-        .status(403)
-        .send({ error: "You are unauthorised for this access" });
+    res.status(403).send({ error: "You are unauthorised for this access" });
 });
 
 router.get("/", auth, async (req, res) => {
-    const userId = req.user._id;
-    const user = await User.findById(userId);
+    if (await isAuthorised(req.user._id)) return res.send(await Report.find({}));
 
-    const authorised = user.isAdmin || user.isSchOfficial;
-    if (authorised) return res.send(await Report.find({}));
-
-    res
-        .status(403)
-        .send({ error: "You are unauthorised for this access" });
+    res.status(403).send({ error: "You are unauthorised for this access" });
 });
+
+async function isAuthorised(userId) {
+    const user = await User.findById(userId);
+    return user.isAdmin || user.isSchOfficial;
+}
 
 export default router;
