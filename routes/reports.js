@@ -36,6 +36,18 @@ router.patch("/seen/:reportId", auth, async (req, res) => {
         : res.status(404).send({ error: "Report does not exist in the database " });
 });
 
+router.get("/:id", auth, async (req, res) => {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+
+    const authorised = user.isAdmin || user.isSchOfficial;
+    if (authorised) return res.send(await Report.findById(req.params.id));
+
+    res
+        .status(403)
+        .send({ error: "You are unauthorised for this access" });
+});
+
 router.get("/", auth, async (req, res) => {
     const userId = req.user._id;
     const user = await User.findById(userId);
