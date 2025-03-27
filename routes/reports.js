@@ -1,6 +1,7 @@
 import express from "express";
 
 import { Report, validateReport } from "../models/report.js";
+import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import validate from "../middlewares/validate.js";
 
@@ -15,11 +16,13 @@ router.post("/", validate(validateReport), async (req, res) => {
 });
 
 router.patch("/seen/:reportId", auth, async (req, res) => {
-    const user = req.user;
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+
     if (!user.isAdmin || !user.isSchOfficial)
         return res
             .status(403)
-            .send({ error: "You are unthorised for this access" });
+            .send({ error: "You are unauthorised for this access" });
 
     const report = await Report.findByIdAndUpdate(
         req.params.reportId,
@@ -33,15 +36,15 @@ router.patch("/seen/:reportId", auth, async (req, res) => {
 });
 
 router.get("/", auth, async (req, res) => {
-    const user = req.user;
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+
     if (!user.isAdmin || !user.isSchOfficial)
         return res
             .status(403)
-            .send({ error: "You are unthorised for this access" });
+            .send({ error: "You are unauthorised for this access" });
 
-    const reports = await Report.find({});
-
-    res.send(reports);
+    res.send(await Report.find({}));
 });
 
 export default router;
