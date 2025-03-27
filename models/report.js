@@ -30,6 +30,10 @@ export const Report = mongoose.model(
             type: [String],
             default: [],
         },
+        seen: {
+            type: Boolean,
+            default: false,
+        },
         timestamp: {
             type: Number,
             default: function () {

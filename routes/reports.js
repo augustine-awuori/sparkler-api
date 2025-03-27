@@ -6,7 +6,7 @@ import validate from "../middlewares/validate.js";
 
 const router = express.Router();
 
-router.post('/', validate(validateReport), async (req, res) => {
+router.post("/", validate(validateReport), async (req, res) => {
     const report = new Report(req.body);
 
     await report.save();
@@ -14,7 +14,19 @@ router.post('/', validate(validateReport), async (req, res) => {
     res.send(report);
 });
 
-router.get('/', [auth], async (req, res) => {
+router.patch("/seen/:reportId", auth, async (req, res) => {
+    const report = await Report.findByIdAndUpdate(
+        req.params.reportId,
+        { seen: true },
+        { new: true }
+    );
+
+    report
+        ? res.send(report)
+        : res.status(404).send({ error: "Report does not exist in the database " });
+});
+
+router.get("/", [auth], async (req, res) => {
     const reports = await Report.find({});
 
     res.send(reports);
