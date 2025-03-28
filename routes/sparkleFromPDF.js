@@ -24,7 +24,7 @@ function summarizeText(text = "", maxLength = 200) {
 
 router.post("/", auth, async (req, res) => {
     try {
-        const { pdfUrl, communities } = req.body;
+        const { pdfUrl, community } = req.body;
 
         console.log("Processing PDF download:", {
             userId: req.user?._id,
@@ -37,12 +37,11 @@ router.post("/", auth, async (req, res) => {
             return res.status(400).send({ error });
         }
 
-        // Download the PDF from the URL
         const response = await axios({
             url: pdfUrl,
             method: "GET",
-            responseType: "arraybuffer", // Get the PDF as a buffer
-            maxContentLength: 5 * 1024 * 1024, // 5MB limit
+            responseType: "arraybuffer",
+            maxContentLength: 5 * 1024 * 1024,
         });
 
         const pdfBuffer = Buffer.from(response.data);
@@ -76,7 +75,7 @@ router.post("/", auth, async (req, res) => {
                 try {
                     await postSparkle(req.user, {
                         text: section.summary,
-                        communities: communities || [],
+                        communities: [community],
                     });
                 } catch (sparkleError) {
                     await saveBug(`Failed to post sparkle: ${sparkleError.message}`);
