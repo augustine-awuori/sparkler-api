@@ -1,5 +1,5 @@
 import express from "express";
-import multer from "multer";
+import axios from "axios";
 import PDFParser from "pdf2json";
 
 import { postSparkle } from "./sparkles.js";
@@ -7,23 +7,6 @@ import { saveBug } from "./bugs.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
-
-// Check environment variables (Railway-specific)
-const requiredEnvVars = ["NODE_ENV"]; // Add your auth-related env vars here
-requiredEnvVars.forEach((varName) => {
-    if (!process.env[varName]) {
-        console.error(`Missing environment variable: ${varName}`);
-    }
-});
-
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype === "application/pdf") cb(null, true);
-        else cb(new Error("Please upload a PDF file"), false);
-    },
-});
 
 function summarizeText(text = "", maxLength = 200) {
     const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
@@ -39,29 +22,33 @@ function summarizeText(text = "", maxLength = 200) {
     return summary.trim();
 }
 
-router.post("/", [upload.single("pdf"), auth], async (req, res) => {
+router.post("/", auth, async (req, res) => {
     try {
-        console.log("Processing PDF upload:", {
+        const { pdfUrl, communities } = req.body;
+
+        console.log("Processing PDF download:", {
             userId: req.user?._id,
-            fileSize: req.file?.size,
-            hasFile: Boolean(req.file)
+            pdfUrl,
         });
 
-        if (!req.user?._id) {
-            const error = "User not authenticated";
-            await saveBug(error);
-            return res.status(401).send({ error });
-        }
-
-        if (!req.file) {
-            const error = "No PDF file uploaded";
+        if (!pdfUrl || typeof pdfUrl !== "string") {
+            const error = "No valid PDF URL provided";
             await saveBug(error);
             return res.status(400).send({ error });
         }
 
-        const pdfBuffer = req.file.buffer;
+        // Download the PDF from the URL
+        const response = await axios({
+            url: pdfUrl,
+            method: "GET",
+            responseType: "arraybuffer", // Get the PDF as a buffer
+            maxContentLength: 5 * 1024 * 1024, // 5MB limit
+        });
+
+        const pdfBuffer = Buffer.from(response.data);
         const pdfParser = new PDFParser();
 
+        // Parse the PDF buffer
         const pdfData = await new Promise((resolve, reject) => {
             pdfParser.on("pdfParser_dataError", (err) => reject(err));
             pdfParser.on("pdfParser_dataReady", (pdfData) => resolve(pdfData));
@@ -89,7 +76,7 @@ router.post("/", [upload.single("pdf"), auth], async (req, res) => {
                 try {
                     await postSparkle(req.user, {
                         text: section.summary,
-                        communities: req.body.communities || [],
+                        communities: communities || [],
                     });
                 } catch (sparkleError) {
                     await saveBug(`Failed to post sparkle: ${sparkleError.message}`);
@@ -97,34 +84,42 @@ router.post("/", [upload.single("pdf"), auth], async (req, res) => {
             })
         );
 
-        const response = {
+        const responseData = {
             totalSections: summarizedSections.length,
             sections: summarizedSections,
             totalPages: pdfData.formImage.Pages.length,
             metadata: {
-                originalFileName: req.file.originalname,
-                fileSize: req.file.size,
+                pdfUrl,
+                fileSize: pdfBuffer.length,
                 processedAt: new Date().toISOString(),
             },
         };
-        console.log("res ", response)
-        res.status(200).send(response);
+        console.log("res ", responseData);
+        res.status(200).send(responseData);
     } catch (error) {
         console.error("PDF route error:", error);
-        await saveBug(`PDF processing error: ${error.message}`);
-        res.status(500).json({
-            error: "Error processing PDF",
+        let errorMessage = "Error processing PDF";
+        let statusCode = 500;
+
+        // Handle specific errors
+        if (error.response) {
+            // Axios error (e.g., URL not found or server error)
+            errorMessage = `Failed to download PDF: ${error.response.statusText}`;
+            statusCode = 400;
+        } else if (error.message.includes("maxContentLength")) {
+            errorMessage = "PDF file exceeds 5MB limit";
+            statusCode = 400;
+        }
+
+        await saveBug(`${errorMessage}: ${error.message}`);
+        res.status(statusCode).json({
+            error: errorMessage,
             details: error.message,
         });
     }
 });
 
-router.use(async (err, req, res) => {
-    if (err instanceof multer.MulterError) {
-        console.error("Multer error:", err);
-        await saveBug(err.message);
-        return res.status(400).json({ error: err.message });
-    }
+router.use(async (err, req, res, next) => {
     console.error("Unexpected error:", err);
     await saveBug(`Unexpected error: ${err.message}`);
     res.status(500).json({
