@@ -186,9 +186,11 @@ router.get("/userFollowings/:userId", async (req, res) => {
       .send({ error: "Could not fetch followings from Stream" });
 
   const followingRes = await client?.feed("timeline", userId).following();
+  const followingStats = await client.feed("timeline", userId).followStats({ following_slugs: ['user'] });
 
   res.send({
     ...response,
+    followingStats,
     results: {
       followers: { ...response.results.followers },
       following: {
