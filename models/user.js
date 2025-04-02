@@ -10,6 +10,7 @@ const schema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true,
+        trim: true
     },
     expoPushToken: Object,
     followers: Object,
@@ -25,6 +26,7 @@ const schema = new mongoose.Schema({
     },
     username: {
         type: String,
+        trim: true,
         unique: true,
     },
     feedToken: String,
@@ -37,6 +39,7 @@ const schema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
+        trim: true
     },
     invalid: {
         type: Boolean,

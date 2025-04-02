@@ -198,7 +198,6 @@ router.get("/userFollowings/:userId", async (req, res) => {
 
   res.send({
     ...response,
-    followingStats,
     results: {
       followers: {
         ...response.results.followers,
