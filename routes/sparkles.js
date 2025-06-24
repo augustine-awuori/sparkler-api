@@ -176,6 +176,7 @@ export async function postSparkle(user, { text = "", communities = [], images = 
         target: `timeline:${userId}`,
         time,
         to: [...mentionsIdsTags, ...hashtagTags, ...parsedCommunities],
+        moderation_template: "sparkle-moderation"
     });
 
     if (sparkle) {
