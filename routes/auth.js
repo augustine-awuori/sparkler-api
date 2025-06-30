@@ -85,7 +85,7 @@ router.post("/verify-auth-code", async (req, res) => {
     const isValidCode = await bcrypt.compare(authCode, user.authCode);
 
     if (!isValidCode)
-        res
+        return res
             .status(400)
             .send({ error: "Invalid username and/or authentication code." });
 
