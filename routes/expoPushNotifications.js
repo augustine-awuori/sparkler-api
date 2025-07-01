@@ -10,7 +10,7 @@ import sendPushNotification from "../utils/pushNotifications.js";
 const router = express.Router();
 
 router.post("/", auth, async (req, res) => {
-  const { message, targetUsersId, title } = req.body;
+  const { message, targetUsersId, title, ...otherProps } = req.body;
 
   targetUsersId.forEach(async (targetUserId) => {
     if (!mongoose.isValidObjectId(targetUserId)) return;
@@ -19,7 +19,11 @@ router.post("/", auth, async (req, res) => {
     if (!targetUser) return;
 
     const { expoPushToken } = targetUser;
-    sendPushNotificationTo([expoPushToken?.data], { message, title });
+    sendPushNotificationTo([expoPushToken?.data], {
+      message,
+      title,
+      ...otherProps,
+    });
   });
 
   res.status(201).send();
