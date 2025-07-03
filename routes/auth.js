@@ -74,8 +74,8 @@ router.post("/code", async (req, res) => {
   accepted
     ? res.send({ message: "Code has been sent to the email provided" })
     : res
-        .status(500)
-        .send({ error: "Something failed while sending the auth code" });
+      .status(500)
+      .send({ error: "Something failed while sending the auth code" });
 });
 
 router.post("/verify-auth-code", async (req, res) => {
