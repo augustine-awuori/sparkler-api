@@ -15,7 +15,9 @@ import {
 import { notifyCommunityMembers } from "../utils/communities.js";
 import { saveBug } from "./bugs.js";
 import { sendPushNotificationTo } from "./expoPushNotifications.js";
+import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
+import politeAuth from "../middlewares/politeAuth.js";
 
 const router = express.Router();
 const SPARKLE_VERB = "sparkle";
@@ -143,7 +145,7 @@ router.delete("/:sparkleId", auth, async (req, res) => {
   }
 });
 
-router.get("/timeline", auth, async (req, res) => {
+router.get("/timeline", politeAuth, async (req, res) => {
   try {
     const client = getClient();
     if (!client) {
@@ -151,7 +153,9 @@ router.get("/timeline", auth, async (req, res) => {
       return res.status(500).send({ error: `Error initializing a client` });
     }
 
-    const userId = req.user._id.toString();
+    const userId = req?.user?._id?.toString() || (await User.findOne({ username: 'awuori' }))._id.toString();
+
+    if (!userId) return res.status(400).send({ error: "App Error! Could not fetch your timeline" });
 
     const userFeed = client.feed("timeline", userId);
     const timeline = await userFeed.get({
