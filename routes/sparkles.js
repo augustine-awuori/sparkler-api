@@ -79,7 +79,8 @@ router.post("/quote", auth, async (req, res) => {
       target: notifyActor ? `notification:${actorId}` : `user:${userId}`,
       time,
       to: [...mentionsIdsTags, ...hashtagTags],
-      verb,
+      moderation_template: "sparkle-moderation",
+      verb, text, images
     });
 
     if (quote) return res.send(quote);
