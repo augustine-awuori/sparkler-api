@@ -49,6 +49,10 @@ const schema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    authDate: {
+        type: Date,
+        default: null,
+    },
     timestamp: {
         type: Number,
         default: function () {

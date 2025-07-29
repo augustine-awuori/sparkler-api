@@ -62,7 +62,16 @@ router.post("/code", async (req, res) => {
     user.feedToken = token;
     user.chatToken = token;
   }
+
+  // Check if authCode is set and authDate is within the last minute
+  if (user.authCode && user.authDate) {
+    const timeDiff = Date.now() - new Date(user.authDate).getTime();
+    const oneMinute = 60 * 1000; // 1 minute in milliseconds
+    if (timeDiff < oneMinute) return res.send({ message: "Code has been sent to the email provided" });
+  }
+
   user.authCode = hashedAuthCode;
+  user.authDate = Date.now();
   await user.save();
 
   const { accepted } = await sendMail({
@@ -94,6 +103,7 @@ router.post("/verify-auth-code", async (req, res) => {
       .send({ error: "Invalid username and/or authentication code." });
 
   user.authCode = "";
+  user.authDate = null;
   user.invalid = false;
   await user.save();
   res.send(user.generateAuthToken());
