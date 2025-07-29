@@ -355,7 +355,7 @@ router.patch("/", auth, async (req, res) => {
   });
 
   streamUser
-    ? res.send(user)
+    ? res.send(user.generateAuthToken())
     : res
       .status(500)
       .send({ error: `Error updating user info: ${streamUser}` });
