@@ -1,7 +1,7 @@
-import db from "./db";
+import dbConfig from "./config";
 
 export const deleteImage = async (url) =>
-  await db.deleteObject(db.ref(db.storage, url));
+  await dbConfig.deleteObject(dbConfig.ref(dbConfig.storage, url));
 
 export const deleteImages = async (urls = []) => {
   const promises = urls.map(async (url) => await deleteImage(url));
