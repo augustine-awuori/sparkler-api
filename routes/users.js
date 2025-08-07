@@ -6,6 +6,7 @@ import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import { createOrGetUser, getClient } from "../utils/func.js";
+import { deleteImages } from "../storage/files.js";
 import {
   User,
   validateUser,
@@ -362,9 +363,45 @@ router.patch("/", auth, async (req, res) => {
 });
 
 router.delete("/", auth, async (req, res) => {
-  const result = await User.findByIdAndDelete(req.user._id);
+  try {
+    const client = getClient();
+    const userId = req.user._id;
+    if (!client)
+      return res.status(500).send({
+        error: "Error deleting account. Client could not be initialized",
+      });
 
-  res.send(result);
+    const userFeed = await client.feed("user", userId);
+    const userSparkles = (
+      await userFeed.get({
+        enrich: true,
+        ownReactions: true,
+        reactions: true,
+        withOwnChildren: true,
+        withOwnReactions: true,
+        withUserId: true,
+        withReactionCounts: true,
+        withRecentReactions: true,
+      })
+    ).results;
+    userSparkles.forEach(async (sparkle) => {
+      await userFeed?.removeActivity(sparkle.id);
+      const images = sparkle.attachments?.images || [];
+      await deleteImages(images);
+    });
+    const userReactions = (
+      await client.reactions.filter({
+        user_id: userId,
+      })
+    ).results;
+    userReactions.forEach((reaction) => client.reactions.delete(reaction.id));
+
+    const result = await User.findByIdAndDelete(userId);
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: "Error deleting user account" });
+  }
 });
 
 export default router;
