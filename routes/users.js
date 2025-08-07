@@ -6,7 +6,6 @@ import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import { createOrGetUser, getClient } from "../utils/func.js";
-import { deleteImages } from "../storage/files.js";
 import {
   User,
   validateUser,
@@ -384,10 +383,8 @@ router.delete("/", auth, async (req, res) => {
         withRecentReactions: true,
       })
     ).results;
-    userSparkles.forEach(async (sparkle) => {
-      await userFeed?.removeActivity(sparkle.id);
-      const images = sparkle.attachments?.images || [];
-      await deleteImages(images);
+    userSparkles.forEach((sparkle) => {
+      userFeed?.removeActivity(sparkle.id);
     });
     const userReactions = (
       await client.reactions.filter({
