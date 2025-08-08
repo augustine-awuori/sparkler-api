@@ -23,7 +23,7 @@ const serverClient = StreamChat.getInstance(
 const router = express.Router();
 
 router.post("/", validate(validateUser), async (req, res) => {
-  const { email, name, authCode } = req.body;
+  const { email, name, authCode, agreeToEULA } = req.body;
 
   const user = await User.findOne({ email });
   if (!user)
@@ -58,6 +58,7 @@ router.post("/", validate(validateUser), async (req, res) => {
       verified,
     });
   } else {
+    user.agreedToEULA = agreeToEULA;
     user.authCode = "";
     await user.save();
   }
