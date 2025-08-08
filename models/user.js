@@ -36,6 +36,10 @@ const schema = new mongoose.Schema({
     instagram: String,
     customLink: String,
     communities: [String],
+    agreedToEULA: {
+        type: Boolean,
+        default: false
+    },
     name: {
         type: String,
         required: true,
@@ -74,7 +78,8 @@ schema.methods.generateAuthToken = function () {
             profileImage: this.profileImage,
             username: this.username,
             verified: this.verified,
-            isAdmin: this.isAdmin
+            isAdmin: this.isAdmin,
+            agreedToEULA: this.agreedToEULA
         },
         process.env.jwtPrivateKey
     );
