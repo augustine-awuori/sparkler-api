@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 const schema = new mongoose.Schema({
     authCode: String,
     bio: String,
+    blockList: [String],
     coverImage: String,
     email: {
         type: String,
