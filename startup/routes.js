@@ -12,6 +12,7 @@ import expoPushNotifications from "../routes/expoPushNotifications.js";
 import expoPushTokens from "../routes/expoPushTokens.js";
 import feedback from "../routes/feedback.js";
 import hashtags from "../routes/hashtags.js";
+import issues from "../routes/issues.js";
 import mails from "../routes/mails.js";
 import projects from "../routes/projects.js";
 import reports from "../routes/reports.js";
@@ -31,6 +32,7 @@ export default function (app) {
   app.use("/api/data", data);
   app.use("/api/expoPushNotifications", expoPushNotifications);
   app.use("/api/expoPushTokens", expoPushTokens);
+  app.use("/api/issues", issues);
   app.use("/api/feedback", feedback);
   app.use("/api/users", users);
   app.use("/api/hashtags", hashtags);
