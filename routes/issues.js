@@ -1,15 +1,16 @@
 import express from "express";
 
 import { Issue } from "../models/issue.js";
-import auth from "../middlewares/auth.js";
+import politeAuth from "../middlewares/politeAuth.js";
 
 const router = express.Router();
 
-router.post('/', auth, async (req, res) => {
+router.post('/', politeAuth, async (req, res) => {
     const { issue, sparkleId } = req.body;
 
     const newIssue = new Issue({
         sparkle: sparkleId,
+        reporter: req.user?._id || '',
         ...issue
     });
 
