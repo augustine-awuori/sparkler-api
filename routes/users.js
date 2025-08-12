@@ -26,20 +26,17 @@ router.post("/", validate(validateUser), async (req, res) => {
   const { email, name, authCode, agreedToEULA } = req.body;
   const user = await User.findOne({ email });
 
-  if (!user)
-    return res.status(400).send({ error: "Auth code isn't generated" });
+  if (!user) return res.status(400).send({ error: "Auth code isn't generated" });
 
   const isValidAuthCode = await bcrypt.compare(
     authCode.toString(),
     user.authCode
   );
-  console.log("isvalid: ", isValidAuthCode);
-  if (!isValidAuthCode) {
-    console.log("err invalid code")
+
+  if (!isValidAuthCode)
     return res
       .status(400)
       .send({ error: "Invalid username and/or auth code." });
-  }
 
   if (user.invalid) {
     user.name = name;
@@ -67,7 +64,6 @@ router.post("/", validate(validateUser), async (req, res) => {
   }
 
   const authToken = user.generateAuthToken();
-  console.log("auth token: ", authCode);
   res
     .status(201)
     .header("x-auth-token", authToken)
@@ -368,16 +364,13 @@ router.patch("/", auth, async (req, res) => {
 
 router.delete("/", auth, async (req, res) => {
   try {
-    console.log("deleting...")
     const client = getClient();
     const userId = req.user._id;
-    console.log("user id", userId)
-    if (!client) {
-      console.log("Invalid client")
+
+    if (!client)
       return res.status(500).send({
         error: "Error deleting account. Client could not be initialized",
       });
-    }
 
     const userFeed = await client.feed("user", userId);
     const userSparkles = (
@@ -404,10 +397,8 @@ router.delete("/", auth, async (req, res) => {
 
     const result = await User.findByIdAndDelete(userId);
 
-    console.log("done")
     res.send(result);
   } catch (error) {
-    console.log("err", error)
     res.status(500).send({ error: "Error deleting user account" });
   }
 });

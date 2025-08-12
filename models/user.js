@@ -50,10 +50,6 @@ const schema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    isSchOfficial: {
-        type: Boolean,
-        default: false,
-    },
     authDate: {
         type: Date,
         default: null,
