@@ -3,6 +3,7 @@ import Joi from "joi";
 import jwt from "jsonwebtoken";
 
 const schema = new mongoose.Schema({
+    amazingId: String,
     authCode: String,
     bio: String,
     blockList: [String],
@@ -89,6 +90,7 @@ export const validateUser = (user) =>
         authCode: Joi.number().required(),
         agreedToEULA: Joi.boolean(),
         bio: Joi.string().optional(),
+        amazingId: Joi.string().optional(),
         coverImage: Joi.string().optional(),
         email: Joi.string().required(),
         invalid: Joi.boolean().optional(),
@@ -106,6 +108,7 @@ export const validateUserWithGoogleAccount = (user) =>
         profileImage: Joi.string().optional(),
         youtube: Joi.string().optional(),
         linkedIn: Joi.string().optional(),
+        amazingId: Joi.string().optional(),
         instagram: Joi.string().optional(),
         customLink: Joi.string().optional(),
         email: Joi.string().required(),
