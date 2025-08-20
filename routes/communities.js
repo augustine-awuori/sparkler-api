@@ -36,6 +36,28 @@ router.get("/:communityId", async (_req, res) => {
         : res.status(404).send({ error: "Community not found!" });
 });
 
+router.post("/sparkles/:communityId", async (req, res) => {
+    const client = getClient();
+    if (!client)
+        return res.status(500).send({ error: "Failed to initialize client" });
+
+    const response = await client
+        .feed("communities", req.params.communityId)
+        .get({
+            enrich: true,
+            ownReactions: true,
+            withOwnChildren: true,
+            withOwnReactions: true,
+            withRecentReactions: true,
+            withReactionCounts: true,
+            ...req.body,
+        });
+
+    response
+        ? res.send(response.results)
+        : res.status(500).send({ error: "Error fetching community sparkles!" });
+});
+
 router.get("/sparkles/:communityId", async (req, res) => {
     const client = getClient();
     if (!client)
