@@ -18,6 +18,7 @@ import { sendPushNotificationTo } from "./expoPushNotifications.js";
 import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import politeAuth from "../middlewares/politeAuth.js";
+import { Community } from "../models/community.js";
 
 const router = express.Router();
 const SPARKLE_VERB = "sparkle";
@@ -207,7 +208,10 @@ export async function postSparkle(
     });
     const time = getEATZone();
     const mentionsUserIds = await getUserIds(getMentions(text));
-    let followersTimeline = getMentionFollowersTimeline(mentionsUserIds, client);
+    let followersTimeline = getMentionFollowersTimeline(
+      mentionsUserIds,
+      client
+    );
     const mentionsIdsTags = prepareMentionsIdsTags(mentionsUserIds);
     const hashtagTags = prepareHashtagTags(getHashtags(text), user);
     const parsedCommunities = communities
@@ -215,6 +219,9 @@ export async function postSparkle(
         communityId ? `communities:${communityId}` : undefined
       )
       .filter((tag) => typeof tag === "string");
+    const communityMembersTimeline = await getCommunityMembersTimeline(
+      communities[0]
+    );
 
     const sparkle = await client.feed("user", userId).addActivity({
       actor: `SU:${userId}`,
@@ -231,6 +238,7 @@ export async function postSparkle(
         ...hashtagTags,
         ...parsedCommunities,
         ...followersTimeline,
+        ...communityMembersTimeline,
       ],
       moderation_template: "sparkle-moderation",
     });
@@ -270,3 +278,13 @@ function getMentionFollowersTimeline(mentionsUserIds, client) {
   return followersTimeline;
 }
 
+function getCommunityMembersTimeline(communityId) {
+  if (!communityId) return [];
+
+  return Community.findById(communityId)
+    .then((community) => {
+      if (!community) return [];
+      return community.members.map((member) => `timeline:${member}`);
+    })
+    .catch(() => []);
+}
