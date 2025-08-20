@@ -82,7 +82,9 @@ router.post("/quote", auth, async (req, res) => {
       time,
       to: [...mentionsIdsTags, ...hashtagTags],
       moderation_template: "sparkle-moderation",
-      verb, text, images
+      verb,
+      text,
+      images,
     });
 
     if (quote) return res.send(quote);
@@ -153,9 +155,14 @@ router.get("/timeline", politeAuth, async (req, res) => {
       return res.status(500).send({ error: `Error initializing a client` });
     }
 
-    const userId = req?.user?._id?.toString() || (await User.findOne({ username: 'awuori' }))._id.toString();
+    const userId =
+      req?.user?._id?.toString() ||
+      (await User.findOne({ username: "awuori" }))._id.toString();
 
-    if (!userId) return res.status(400).send({ error: "App Error! Could not fetch your timeline" });
+    if (!userId)
+      return res
+        .status(400)
+        .send({ error: "App Error! Could not fetch your timeline" });
 
     const userFeed = client.feed("timeline", userId);
     const timeline = await userFeed.get({
@@ -200,6 +207,7 @@ export async function postSparkle(
     });
     const time = getEATZone();
     const mentionsUserIds = await getUserIds(getMentions(text));
+    let followersTimeline = getMentionFollowersTimeline(mentionsUserIds, client);
     const mentionsIdsTags = prepareMentionsIdsTags(mentionsUserIds);
     const hashtagTags = prepareHashtagTags(getHashtags(text), user);
     const parsedCommunities = communities
@@ -218,7 +226,12 @@ export async function postSparkle(
       time,
       text,
       images,
-      to: [...mentionsIdsTags, ...hashtagTags, ...parsedCommunities],
+      to: [
+        ...mentionsIdsTags,
+        ...hashtagTags,
+        ...parsedCommunities,
+        ...followersTimeline,
+      ],
       moderation_template: "sparkle-moderation",
     });
 
@@ -240,3 +253,20 @@ export async function postSparkle(
 }
 
 export default router;
+
+function getMentionFollowersTimeline(mentionsUserIds, client) {
+  let followersTimeline = [];
+
+  mentionsUserIds.forEach(async (id) => {
+    const response = await client.feed("user", id).followers();
+
+    const mentionFollowers = (response?.results || []).map(
+      (follower) => follower.feed_id
+    );
+
+    followersTimeline = [...followersTimeline, ...mentionFollowers];
+  });
+
+  return followersTimeline;
+}
+
