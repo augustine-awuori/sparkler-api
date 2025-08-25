@@ -37,6 +37,7 @@ const schema = new mongoose.Schema({
     linkedIn: String,
     instagram: String,
     customLink: String,
+    pinnedSparkle: String,
     communities: [String],
     agreedToEULA: {
         type: Boolean,
@@ -95,6 +96,7 @@ export const validateUser = (user) =>
         email: Joi.string().required(),
         invalid: Joi.boolean().optional(),
         name: Joi.string().required(),
+        pinnedSparkle: Joi.string().required(),
         profileImage: Joi.string().optional(),
         youtube: Joi.string().optional(),
         linkedIn: Joi.string().optional(),
