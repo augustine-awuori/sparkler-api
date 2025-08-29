@@ -96,6 +96,7 @@ export const validateUser = (user) =>
         email: Joi.string().required(),
         invalid: Joi.boolean().optional(),
         name: Joi.string().required(),
+        username: Joi.string(),
         pinnedSparkle: Joi.string().required(),
         profileImage: Joi.string().optional(),
         youtube: Joi.string().optional(),
