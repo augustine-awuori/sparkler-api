@@ -1,16 +1,7 @@
-import nodemailer from "nodemailer";
 import Mailgen from "mailgen";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
-
+const resend = new Resend(process.env.EMAIL_PASS);
 
 function generateHTMLEmail({ message }) {
     const mailGenerator = new Mailgen({
@@ -34,11 +25,11 @@ function generateHTMLEmail({ message }) {
 export async function sendMail({ message, to, subject }) {
     const htmlEmail = generateHTMLEmail({ message });
 
-    return await transporter.sendMail({
-        from: `"Sparkler" ${process.env.EMAIL_USER}`,
+    return await resend.emails.send({
+        from: "Sparkler@sparkler.lol",
         to,
         subject,
+        html: generateHTMLEmail({ message }),
         text: htmlEmail ? "" : `Hello Sparkler, ${message}`,
-        html: htmlEmail || "",
     });
 }

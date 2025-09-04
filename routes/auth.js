@@ -74,17 +74,18 @@ router.post("/code", async (req, res) => {
   user.authDate = Date.now();
   await user.save();
 
-  const { accepted } = await sendMail({
+  const response = await sendMail({
     message: `Your one time authentication code is: ${authCode}`,
     subject: "Sparkler Auth Code",
     to: email,
   });
 
-  accepted
+  console.log("email response: ", response)
+  response?.data
     ? res.send({ message: "Code has been sent to the email provided" })
     : res
       .status(500)
-      .send({ error: "Something failed while sending the auth code" });
+      .send({ error: response?.error });
 });
 
 router.post("/verify-auth-code", async (req, res) => {

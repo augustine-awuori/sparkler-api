@@ -11,11 +11,11 @@ router.post("/all", [auth, admin], async (req, res) => {
     const { subject, message } = req.body;
 
     const emails = (await User.find({})).map((user) => user.email);
-    const { accepted } = await sendMail({ to: emails, message, subject });
+    const { data, error } = await sendMail({ to: emails, message, subject });
 
-    accepted
+    data
         ? res.send({ message: "Email sent" })
-        : res.status(500).send({ error: "Something failed while sending email" });
+        : res.status(500).send({ error: error || "Something failed while sending email" });
 });
 
 router.post("/incomplete", [auth, admin], async (_req, res) => {
@@ -38,9 +38,9 @@ With Auth Code at Sparkler, we're going passwordless—you don't need to remembe
 Additionally, we have an update available on the Play Store with new features and improvements.  
 Make sure to update your app for the best experience.
 `;
-    const { accepted } = await sendMail({ to: emails, message, subject });
+    const { data } = await sendMail({ to: emails, message, subject });
 
-    accepted
+    data
         ? res.send({ message: "Email sent" })
         : res.status(500).send({ error: "Something failed while sending email" });
 });
@@ -49,9 +49,9 @@ router.post("/:email", [auth, admin], async (req, res) => {
     const { subject, message } = req.body;
     const { email } = req.params;
 
-    const { accepted } = await sendMail({ to: email, message, subject });
+    const { data } = await sendMail({ to: email, message, subject });
 
-    accepted
+    data
         ? res.send({ message: "Email sent" })
         : res.status(500).send({ error: "Something failed while sending email" });
 });
