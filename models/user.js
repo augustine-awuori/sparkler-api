@@ -17,6 +17,8 @@ const schema = new mongoose.Schema({
     expoPushToken: Object,
     followers: Object,
     following: Object,
+    followersId: [String],
+    followingId: [String],
     profileImage: String,
     verified: {
         type: Boolean,
