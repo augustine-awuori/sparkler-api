@@ -22,53 +22,59 @@ const serverClient = StreamChat.getInstance(
 
 const router = express.Router();
 
-router.post("/", validate(validateUser), async (req, res) => {
-  const { email, name, authCode, agreedToEULA } = req.body;
-  const user = await User.findOne({ email });
+router.post("/", async (req, res) => {
+  try {
+    const { email, name, authCode, agreedToEULA } = req.body;
+    const user = await User.findOne({ email });
 
-  if (!user) return res.status(400).send({ error: "Auth code isn't generated" });
+    if (!user)
+      return res.status(400).send({ error: "Auth code isn't generated" });
 
-  const isValidAuthCode = await bcrypt.compare(
-    authCode.toString(),
-    user.authCode
-  );
+    const isValidAuthCode = await bcrypt.compare(
+      authCode.toString(),
+      user.authCode
+    );
 
-  if (!isValidAuthCode)
-    return res
-      .status(400)
-      .send({ error: "Invalid username and/or auth code." });
+    if (!isValidAuthCode)
+      return res
+        .status(400)
+        .send({ error: "Invalid username and/or auth code." });
 
-  if (user.invalid) {
-    user.name = name;
-    user.username = await findUniqueUsername(name);
-    user.invalid = false;
-    user.authCode = "";
-    await user.save();
+    if (user.invalid) {
+      user.name = name;
+      user.username = await findUniqueUsername(name);
+      user.invalid = false;
+      user.authCode = "";
+      await user.save();
 
-    const { chatToken, feedToken, invalid, username, verified, email } = user;
-    await (
-      await createOrGetUser(user)
-    )?.update({
-      chatToken,
-      feedToken,
-      email,
-      invalid,
-      name,
-      username,
-      verified,
-    });
-  } else {
-    user.agreedToEULA = agreedToEULA;
-    user.authCode = "";
-    await user.save();
+      const { chatToken, feedToken, invalid, username, verified, email } = user;
+      await (
+        await createOrGetUser(user)
+      )?.update({
+        chatToken,
+        feedToken,
+        email,
+        invalid,
+        name,
+        username,
+        verified,
+      });
+    } else {
+      user.agreedToEULA = agreedToEULA;
+      user.authCode = "";
+      await user.save();
+    }
+
+    const authToken = user.generateAuthToken();
+
+    res
+      .status(201)
+      .header("x-auth-token", authToken)
+      .header("access-control-expose-headers", "x-auth-token")
+      .send(authToken);
+  } catch (error) {
+    console.error(`Error registering user: ${error}`);
   }
-
-  const authToken = user.generateAuthToken();
-  res
-    .status(201)
-    .header("x-auth-token", authToken)
-    .header("access-control-expose-headers", "x-auth-token")
-    .send(authToken);
 });
 
 router.post(
