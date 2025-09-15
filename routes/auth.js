@@ -55,7 +55,7 @@ router.post("/code", async (req, res) => {
   const hashedAuthCode = await bcrypt.hash(authCode.toString(), salt);
 
   if (!user) {
-    const name = "Unknown";
+    const name = email;
     const username = await findUniqueUsername(name);
     user = new User({ email, name, username, invalid: true });
     const token = serverClient.createToken(user._id.toString());
