@@ -3,6 +3,10 @@ import Joi from "joi";
 import jwt from "jsonwebtoken";
 
 const schema = new mongoose.Schema({
+    isOfAge: {
+        default: true,
+        type: Boolean,
+    },
     amazingId: String,
     authCode: String,
     bio: String,
@@ -12,7 +16,7 @@ const schema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true,
-        trim: true
+        trim: true,
     },
     expoPushToken: Object,
     followers: Object,
@@ -43,12 +47,12 @@ const schema = new mongoose.Schema({
     communities: [String],
     agreedToEULA: {
         type: Boolean,
-        default: false
+        default: false,
     },
     name: {
         type: String,
         required: true,
-        trim: true
+        trim: true,
     },
     invalid: {
         type: Boolean,
@@ -80,7 +84,7 @@ schema.methods.generateAuthToken = function () {
             username: this.username,
             verified: this.verified,
             isAdmin: this.isAdmin,
-            agreedToEULA: this.agreedToEULA
+            agreedToEULA: this.agreedToEULA,
         },
         process.env.jwtPrivateKey
     );
