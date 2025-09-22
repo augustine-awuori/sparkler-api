@@ -12,6 +12,7 @@ const schema = new mongoose.Schema({
     bio: String,
     blockList: [String],
     coverImage: String,
+    dob: Date,
     email: {
         type: String,
         required: true,
@@ -74,17 +75,18 @@ schema.methods.generateAuthToken = function () {
     return jwt.sign(
         {
             _id: this._id,
+            agreedToEULA: this.agreedToEULA,
             bio: this.bio,
-            invalid: this.invalid,
             chatToken: this.chatToken,
             email: this.email,
             feedToken: this.feedToken,
+            invalid: this.invalid,
+            isAdmin: this.isAdmin,
+            isOfAge: this.isOfAge,
             name: this.name,
             profileImage: this.profileImage,
             username: this.username,
             verified: this.verified,
-            isAdmin: this.isAdmin,
-            agreedToEULA: this.agreedToEULA,
         },
         process.env.jwtPrivateKey
     );
