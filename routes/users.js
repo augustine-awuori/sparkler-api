@@ -226,7 +226,9 @@ router.get("/:userId/following", async (req, res) => {
   try {
     const client = getClient();
 
-    const response = await client?.feed("timeline", userId).following();
+    const response = await client?.feed("timeline", userId).following({
+      limit: 100,
+    });
 
     response
       ? res.send(response.results)
@@ -244,7 +246,9 @@ router.get("/:userId/followers", async (req, res) => {
   try {
     const client = getClient();
 
-    const response = await client?.feed("user", userId).followers();
+    const response = await client?.feed("user", userId).followers({
+      limit: 100,
+    });
 
     response
       ? res.send(response.results)
