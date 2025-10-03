@@ -12,13 +12,14 @@ import {
   prepareHashtagTags,
   prepareMentionsIdsTags,
 } from "../utils/func.js";
+import { Community } from "../models/community.js";
 import { notifyCommunityMembers } from "../utils/communities.js";
 import { saveBug } from "./bugs.js";
 import { sendPushNotificationTo } from "./expoPushNotifications.js";
+import { Sparkle } from "../models/sparkle.js";
 import { User } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import politeAuth from "../middlewares/politeAuth.js";
-import { Community } from "../models/community.js";
 
 const router = express.Router();
 const SPARKLE_VERB = "sparkle";
@@ -29,7 +30,10 @@ router.post("/", auth, async (req, res) => {
 
     const sparkle = await postSparkle(req.user, req.body);
 
-    if (sparkle) return res.send(sparkle);
+    if (sparkle) {
+      new Sparkle({ ...sparkle, text: req.body?.text }).save();
+      return res.send(sparkle);
+    }
 
     await saveBug(`Sparkle is falsy, couldn't create it: ${sparkle}`);
     res.status(500).send({ error: "Couldn't create the sparkle" });
@@ -223,7 +227,7 @@ export async function postSparkle(
       communities[0]
     );
 
-    const sparkle = await client.feed("user", userId).addActivity({
+    const sparkleData = {
       actor: `SU:${userId}`,
       verb: SPARKLE_VERB,
       attachments: { images },
@@ -241,7 +245,10 @@ export async function postSparkle(
         ...communityMembersTimeline,
       ],
       moderation_template: "sparkle-moderation",
-    });
+    }
+    const sparkle = await client.feed("user", userId).addActivity(sparkleData);
+    new Sparkle({ ...sparkleData }).save();
+
 
     if (sparkle) {
       if (forCommunity)
