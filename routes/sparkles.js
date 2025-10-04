@@ -31,7 +31,7 @@ router.post("/", auth, async (req, res) => {
     const sparkle = await postSparkle(req.user, req.body);
 
     if (sparkle) {
-      new Sparkle({ ...sparkle, text: req.body?.text }).save();
+      new Sparkle({ ...sparkle }).save();
       return res.send(sparkle);
     }
 
@@ -245,10 +245,9 @@ export async function postSparkle(
         ...communityMembersTimeline,
       ],
       moderation_template: "sparkle-moderation",
-    }
+    };
     const sparkle = await client.feed("user", userId).addActivity(sparkleData);
     new Sparkle({ ...sparkleData }).save();
-
 
     if (sparkle) {
       if (forCommunity)

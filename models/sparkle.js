@@ -9,6 +9,7 @@ const schema = new mongoose.Schema({
     object: String,
     target: String,
     time: String,
+    text: String,
     to: [String],
     verb: String,
     timestamp: {
