@@ -8,7 +8,7 @@ function generateHTMLEmail({ message }) {
         theme: "default",
         product: {
             name: "Sparkler",
-            link: "https://sparkler.lol/",
+            link: "https://sparkler.website/",
             logo: "",
         },
     });
@@ -26,10 +26,10 @@ export async function sendMail({ message, to, subject }) {
     const htmlEmail = generateHTMLEmail({ message });
 
     return await resend.emails.send({
-        from: "Sparkler@sparkler.lol",
+        from: "Sparkler@sparkler.website",
         to,
         subject,
         html: generateHTMLEmail({ message }),
-        text: htmlEmail ? "" : `Hello Sparkler, ${message}`,
+        text: htmlEmail ? "" : `Hello, ${message}`,
     });
 }
