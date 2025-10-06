@@ -13,7 +13,7 @@ router.get("/", async (_req, res) => {
             .limit(20)
             .lean(); // Faster: returns plain JS objects, no Mongoose overhead
 
-        const apiKey = process.env.POE_API_KEY;
+        const apiKey = process.env.SparklerAI_ApiKey;
         if (!apiKey) {
             throw new Error("POE_API_KEY env var missing—check your secrets!");
         }
