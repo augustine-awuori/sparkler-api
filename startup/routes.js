@@ -10,6 +10,7 @@ import data from "../routes/data.js";
 import error from "../middlewares/error.js";
 import expoPushNotifications from "../routes/expoPushNotifications.js";
 import expoPushTokens from "../routes/expoPushTokens.js";
+import explore from "../routes/explore.js";
 import feedback from "../routes/feedback.js";
 import grao from "../routes/grao.js";
 import hashtags from "../routes/hashtags.js";
@@ -33,6 +34,7 @@ export default function (app) {
   app.use("/api/data", data);
   app.use("/api/expoPushNotifications", expoPushNotifications);
   app.use("/api/expoPushTokens", expoPushTokens);
+  app.use("/api/explore", explore);
   app.use("/api/feedback", feedback);
   app.use("/api/grao", grao);
   app.use("/api/hashtags", hashtags);
