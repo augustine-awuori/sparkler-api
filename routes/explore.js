@@ -63,7 +63,7 @@ router.get("/", async (_req, res) => {
 });
 
 router.post("/themeSparkles", async (req, res) => {
-    const { headline, teaser } = req.body; 
+    const { headline, teaser } = req.body;
 
     if (!headline && !teaser) return res.json([]);
 
@@ -83,7 +83,7 @@ router.post("/themeSparkles", async (req, res) => {
         const prompt = `Given the theme headline: "${headline}" and teaser: "${teaser}", analyze the following sparkles and output STRICTLY a JSON array of strings containing ONLY the IDs of the sparkles that highly relate to this theme.Use the 'id' field from each sparkle.No other text or explanation—just the array like["id1", "id2", ...]. Sparkles data: ${sparkleData} `;
 
         const response = await openai.chat.completions.create({
-            model: "SparklerAI", // Or "Grok-4-Fast-Reasoning" if swapping
+            model: "SparklerAI_Sparkles", // Or "Grok-4-Fast-Reasoning" if swapping
             messages: [
                 {
                     role: "system",
@@ -106,25 +106,7 @@ router.post("/themeSparkles", async (req, res) => {
             throw new Error("Invalid array response from API");
         }
 
-        const client = getClient();
-        if (!client) {
-            saveBug(`Error getting sparkles of ids, client is falsy`);
-            return res.status(500).send({ error: `Error initializing a client` });
-        }
-
-        const result = await client.getActivities({
-            ids: parsed,
-            enrich: true,
-            ownReactions: true,
-            reactions: true,
-            withOwnChildren: true,
-            withOwnReactions: true,
-            withUserId: true,
-            withReactionCounts: true,
-            withRecentReactions: true,
-        });
-
-        res.send(result.results);
+        res.send(parsed);
     } catch (err) {
         console.error("Theme Sparkles route error:", err);
         if (err.message.includes("JSON") || err.message.includes("array")) {
