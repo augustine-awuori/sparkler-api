@@ -62,8 +62,8 @@ router.get("/", async (_req, res) => {
     }
 });
 
-router.get("/themeSparkles", async (req, res) => {
-    const { headline, teaser } = req.query; // Use query params for GET route
+router.post("/themeSparkles", async (req, res) => {
+    const { headline, teaser } = req.body; 
 
     if (!headline && !teaser) return res.json([]);
 
