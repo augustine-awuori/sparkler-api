@@ -2,6 +2,7 @@ import express from "express";
 import { OpenAI } from "openai";
 
 import { Sparkle } from "../models/sparkle.js";
+import { getClient } from "../utils/func.js";
 
 const router = express.Router();
 
@@ -105,7 +106,25 @@ router.get("/themeSparkles", async (req, res) => {
             throw new Error("Invalid array response from API");
         }
 
-        res.json(parsed); // Send the array of IDs directly
+        const client = getClient();
+        if (!client) {
+            saveBug(`Error getting sparkles of ids, client is falsy`);
+            return res.status(500).send({ error: `Error initializing a client` });
+        }
+
+        const result = await client.getActivities({
+            ids: parsed,
+            enrich: true,
+            ownReactions: true,
+            reactions: true,
+            withOwnChildren: true,
+            withOwnReactions: true,
+            withUserId: true,
+            withReactionCounts: true,
+            withRecentReactions: true,
+        });
+
+        res.send(result.results);
     } catch (err) {
         console.error("Theme Sparkles route error:", err);
         if (err.message.includes("JSON") || err.message.includes("array")) {
