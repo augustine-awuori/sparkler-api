@@ -15,7 +15,11 @@ export const Community = mongoose.model(
         bio: String,
         profileImage: String,
         coverImage: String,
-        members: [{ type: mongoose.Types.ObjectId, ref: 'User' }]
+        members: [{ type: mongoose.Types.ObjectId, ref: 'User' }],
+        whatsapp: String,
+        instagram: String,
+        youtube: String,
+        customLink: String
     })
 );
 
@@ -24,4 +28,8 @@ export const validateCommunity = (community) =>
         creator: Joi.string().optional(),
         name: Joi.string().required(),
         bio: Joi.string().optional(),
+        whatsapp: Joi.string().uri().optional().allow(''),
+        instagram: Joi.string().uri().optional().allow(''),
+        youtube: Joi.string().uri().optional().allow(''),
+        customLink: Joi.string().uri().optional().allow(''),
     }).validate(community);
