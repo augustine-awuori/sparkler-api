@@ -50,6 +50,10 @@ const schema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    createsContent: {
+        type: Boolean,
+        default: false,
+    },
     name: {
         type: String,
         required: true,
