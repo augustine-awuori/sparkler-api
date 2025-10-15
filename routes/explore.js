@@ -68,7 +68,10 @@ router.post("/themeSparkles", async (req, res) => {
     if (!headline && !teaser) return res.json([]);
 
     try {
-        const sparkles = await Sparkle.find({}).sort({ createdAt: -1 }).lean();
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const sparkles = await Sparkle.find({ createdAt: { $gte: sevenDaysAgo } })
+            .sort({ createdAt: -1 })
+            .lean();
 
         const apiKey = process.env.POE_API_KEY;
         if (!apiKey)
