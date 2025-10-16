@@ -243,7 +243,7 @@ export async function postSparkle(
     );
     const mentionsIdsTags = prepareMentionsIdsTags(mentionsUserIds);
     const hashtagTags = prepareHashtagTags(getHashtags(text), user);
-    const parsedCommunities = communities
+    const parsedCommunities = (communities || [])
       .map((communityId) =>
         communityId ? `communities:${communityId}` : undefined
       )
