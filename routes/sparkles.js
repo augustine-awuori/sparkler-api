@@ -51,8 +51,13 @@ router.patch("/:sparkleId", auth, async (req, res) => {
       return res.status(500).send({ error: `Error initializing a client` });
     }
 
-    const { text, collectionId } = req.body;
-    client.collections.update(SPARKLE_VERB, collectionId, { text });
+    const { text, collectionId, communities } = req.body;
+    const forCommunity = communities.length > 0;
+    client.collections.update(SPARKLE_VERB, collectionId, {
+      text,
+      edited: true,
+      communities: forCommunity ? communities[0] : "",
+    });
     const userFeed = client.feed("user", req.user._id.toString());
     const updatedActivity = await userFeed?.updateActivity({
       id: req.params.sparkleId,
@@ -228,7 +233,6 @@ export async function postSparkle(
     const forCommunity = communities.length > 0;
     const collection = await client.collections.add(SPARKLE_VERB, nanoid(), {
       text,
-      forCommunity,
       community: forCommunity ? communities[0] : "",
     });
     const time = getEATZone();
