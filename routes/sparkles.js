@@ -43,6 +43,27 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
+router.patch("/:sparkleId", auth, async (req, res) => {
+  try {
+    const client = getClient();
+    if (!client) {
+      saveBug(`Error initializing client while trying to edit a sparkle`);
+      return res.status(500).send({ error: `Error initializing a client` });
+    }
+
+    const { text, collectionId } = req.body;
+    client.collections.update(SPARKLE_VERB, collectionId, { text });
+    const userFeed = client.feed("user", req.user._id.toString());
+    const updatedActivity = await userFeed?.updateActivity({
+      id: req.params.sparkleId,
+      text,
+    });
+    res.send(updatedActivity);
+  } catch (error) {
+    res.status(500).send({ error: "Error editing a sparkle" });
+  }
+});
+
 router.post("/quote", auth, async (req, res) => {
   try {
     const client = getClient();
