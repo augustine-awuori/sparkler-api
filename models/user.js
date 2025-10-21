@@ -46,6 +46,10 @@ const schema = new mongoose.Schema({
     customLink: String,
     pinnedSparkle: String,
     communities: [String],
+    agreeToChildPolicy: {
+        type: Boolean,
+        default: false,
+    },
     agreedToEULA: {
         type: Boolean,
         default: false,
