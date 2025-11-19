@@ -178,6 +178,42 @@ router.delete("/:sparkleId", auth, async (req, res) => {
   }
 });
 
+router.get("/timeline/default", politeAuth, async (req, res) => {
+  try {
+    const client = getClient();
+    if (!client) {
+      saveBug(`Error initializing client while getting timeline`);
+      return res.status(500).send({ error: `Error initializing a client` });
+    }
+
+    const userId = (await User.findOne({ username: "awuori" }))._id.toString();
+    if (!userId)
+      return res
+        .status(400)
+        .send({ error: "App Error! Could not fetch your timeline" });
+
+    const userFeed = client.feed("timeline", userId);
+    const timeline = await userFeed.get({
+      enrich: true,
+      ownReactions: true,
+      reactions: true,
+      withOwnChildren: true,
+      withOwnReactions: true,
+      withUserId: true,
+      withReactionCounts: true,
+      withRecentReactions: true,
+    });
+
+    if (timeline) return res.send(timeline.results);
+
+    saveBug(`Timeline is falsy, couldn't retrieve it: ${timeline}`);
+    res.status(500).send({ error: "Something failed getting timeline" });
+  } catch (error) {
+    saveBug(`Error catched while retrieving timeline ${error}`);
+    res.status(500).send({ error: "Error getting timeline" });
+  }
+});
+
 router.get("/timeline", politeAuth, async (req, res) => {
   try {
     const client = getClient();
