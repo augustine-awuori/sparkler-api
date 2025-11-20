@@ -227,14 +227,14 @@ router.get("/:userId/following", async (req, res) => {
     const client = getClient();
 
     const response = await client?.feed("timeline", userId).following({
-      limit: "1_000",
+      limit: 1_000,
     });
 
     response
       ? res.send(response.results)
       : res.status(500).send({ error: "Something went wrong" });
   } catch (error) {
-    res.send({ error: `Error fetching user's sparkles ${error}` });
+    res.send({ error: `Error fetching user's follwoing ${error}` });
   }
 });
 
@@ -247,7 +247,7 @@ router.get("/:userId/followers", async (req, res) => {
     const client = getClient();
 
     const response = await client?.feed("user", userId).followers({
-      limit: "1_000",
+      limit: 1_000,
     });
 
     response
