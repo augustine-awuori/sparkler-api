@@ -227,7 +227,7 @@ router.get("/:userId/following", async (req, res) => {
     const client = getClient();
 
     const response = await client?.feed("timeline", userId).following({
-      limit: 100,
+      limit: "1_000",
     });
 
     response
@@ -247,7 +247,7 @@ router.get("/:userId/followers", async (req, res) => {
     const client = getClient();
 
     const response = await client?.feed("user", userId).followers({
-      limit: 100,
+      limit: "1_000",
     });
 
     response
@@ -368,8 +368,8 @@ router.patch("/", auth, async (req, res) => {
   streamUser
     ? res.send(user.generateAuthToken())
     : res
-      .status(500)
-      .send({ error: `Error updating user info: ${streamUser}` });
+        .status(500)
+        .send({ error: `Error updating user info: ${streamUser}` });
 });
 
 router.delete("/", auth, async (req, res) => {
