@@ -67,7 +67,8 @@ router.post("/code", async (req, res) => {
   if (user.authCode && user.authDate) {
     const timeDiff = Date.now() - new Date(user.authDate).getTime();
     const oneMinute = 60 * 1000; // 1 minute in milliseconds
-    if (timeDiff < oneMinute) return res.send({ message: "Code has been sent to the email provided" });
+    if (timeDiff < oneMinute)
+      return res.send({ message: "Code has been sent to the email provided" });
   }
 
   user.authCode = hashedAuthCode;
@@ -80,12 +81,10 @@ router.post("/code", async (req, res) => {
     to: email,
   });
 
-  console.log("email response: ", response)
+  console.log("email response: ", response);
   response?.data
     ? res.send({ message: "Code has been sent to the email provided" })
-    : res
-      .status(500)
-      .send({ error: response?.error });
+    : res.status(500).send({ error: response?.error });
 });
 
 router.post("/verify-auth-code", async (req, res) => {
@@ -108,6 +107,16 @@ router.post("/verify-auth-code", async (req, res) => {
   user.invalid = false;
   await user.save();
   res.send(user.generateAuthToken());
+});
+
+router.post("/verify-with-email", async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+
+  user
+    ? res.send(user.generateAuthToken())
+    : res.status(404).send({ error: "Email isn't registered." });
 });
 
 export default router;
