@@ -186,7 +186,9 @@ router.get("/userFollowings/:userId", async (req, res) => {
   if (!client)
     return res.status(500).send({ error: "Client couldn't be initialized" });
 
-  let response = await client?.feed("user", userId).followStats({});
+  let response = await client?.feed("user", userId).followStats({
+    limit: 1000
+  });
   if (!response)
     return res
       .status(500)
