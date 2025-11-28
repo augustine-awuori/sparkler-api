@@ -101,6 +101,8 @@ router.post(
       const token = serverClient.createToken(user._id.toString());
       user.feedToken = token;
       user.chatToken = token;
+      user.agreeToChildPolicy = true;
+      user.agreedToEULA = true;
 
       await user.save();
     }
@@ -187,7 +189,7 @@ router.get("/userFollowings/:userId", async (req, res) => {
     return res.status(500).send({ error: "Client couldn't be initialized" });
 
   let response = await client?.feed("user", userId).followStats({
-    limit: 1000
+    limit: 1000,
   });
   if (!response)
     return res
