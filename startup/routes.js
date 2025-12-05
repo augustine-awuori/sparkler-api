@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import serveStatic from "serve-static";
 
+import alumnis from "../routes/alumnis.js";
 import auth from "../routes/auth.js";
 import bugs from "../routes/bugs.js";
 import chatToken from "../routes/chatToken.js";
@@ -27,6 +28,7 @@ export default function (app) {
   app.use(express.json());
   app.use(serveStatic("public", { acceptRanges: false }));
   app.use(cors({ origin: "*" }));
+  app.use("/api/alumnis", alumnis);
   app.use("/api/auth", auth);
   app.use("/api/bugs", bugs);
   app.use("/api/chatToken", chatToken);
