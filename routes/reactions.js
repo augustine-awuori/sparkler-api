@@ -28,8 +28,8 @@ router.post("/add", auth, async (req, res) => {
     ok
       ? res.send(data)
       : res.status(500).send({
-        error: `Couldn't add a reaction ${data}`,
-      });
+          error: `Couldn't add a reaction ${data}`,
+        });
   } catch (error) {
     res
       .status(500)
@@ -54,8 +54,8 @@ router.post("/addChild", auth, async (req, res) => {
     response.ok
       ? res.send(response.data)
       : res.status(500).send({
-        error: `Couldn't add a reaction ${response.data}`,
-      });
+          error: `Couldn't add a reaction ${response.data}`,
+        });
   } catch (error) {
     res
       .status(500)
@@ -98,10 +98,15 @@ router.post("/toggle", auth, async (req, res) => {
         : res.status(500).send({ error: data || "Something failed" });
     } else {
       const notifyActor = userId !== actorId && !done;
+      const defaultTargetFeeds = notifyActor ? getTargetFeeds(actorId) : [];
+      const targetFeeds =
+        kind === "resparkle"
+          ? [`user:${userId}`, ...defaultTargetFeeds]
+          : defaultTargetFeeds;
 
       const { data, ok } = await addReaction({
         ...req.body,
-        targetFeeds: notifyActor ? getTargetFeeds(actorId) : [],
+        targetFeeds,
         userId,
       });
 
