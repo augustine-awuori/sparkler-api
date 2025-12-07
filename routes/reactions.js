@@ -101,7 +101,7 @@ router.post("/toggle", auth, async (req, res) => {
       const defaultTargetFeeds = notifyActor ? getTargetFeeds(actorId) : [];
       const targetFeeds =
         kind === "resparkle"
-          ? [`user:${userId}`, ...defaultTargetFeeds]
+          ? [`timeline:${userId}`, ...defaultTargetFeeds]
           : defaultTargetFeeds;
 
       const { data, ok } = await addReaction({
