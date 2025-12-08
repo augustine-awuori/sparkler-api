@@ -22,4 +22,9 @@ router.get("/", async (_req, res) => {
   res.send(alumnis);
 });
 
+router.get("/count", async (_req, res) => {
+  const count = await Alumni.countDocuments();
+  res.send({ count });
+});
+
 export default router;
