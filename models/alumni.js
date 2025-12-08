@@ -10,8 +10,7 @@ export const Alumni = mongoose.model(
       trim: true,
     },
     course: {
-      type: mongoose.Types.ObjectId,
-      ref: "Course",
+      type: String,
       required: true,
     },
     school: {
@@ -20,9 +19,11 @@ export const Alumni = mongoose.model(
       required: true,
     },
     regNo: {
-      type: String,
       required: true,
       trim: true,
+      type: String,
+      uppercase: true,
+      unique: true,
     },
   })
 );
