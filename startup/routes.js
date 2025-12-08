@@ -7,6 +7,7 @@ import auth from "../routes/auth.js";
 import bugs from "../routes/bugs.js";
 import chatToken from "../routes/chatToken.js";
 import communities from "../routes/communities.js";
+import courses from "../routes/courses.js";
 import data from "../routes/data.js";
 import error from "../middlewares/error.js";
 import expoPushNotifications from "../routes/expoPushNotifications.js";
@@ -31,6 +32,7 @@ export default function (app) {
   app.use("/api/alumnis", alumnis);
   app.use("/api/auth", auth);
   app.use("/api/bugs", bugs);
+  app.use("/api/courses", courses);
   app.use("/api/chatToken", chatToken);
   app.use("/api/communities", communities);
   app.use("/api/data", data);

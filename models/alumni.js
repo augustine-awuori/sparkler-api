@@ -10,14 +10,14 @@ export const Alumni = mongoose.model(
       trim: true,
     },
     course: {
-      type: String,
+      type: mongoose.Types.ObjectId,
+      ref: "Course",
       required: true,
-      trim: true,
     },
     school: {
-      type: String,
+      type: mongoose.Types.ObjectId,
+      ref: "School",
       required: true,
-      trim: true,
     },
     regNo: {
       type: String,
