@@ -9,6 +9,7 @@ import chatToken from "../routes/chatToken.js";
 import communities from "../routes/communities.js";
 import courses from "../routes/courses.js";
 import data from "../routes/data.js";
+import departments from "../routes/departments.js";
 import error from "../middlewares/error.js";
 import expoPushNotifications from "../routes/expoPushNotifications.js";
 import expoPushTokens from "../routes/expoPushTokens.js";
@@ -36,6 +37,7 @@ export default function (app) {
   app.use("/api/chatToken", chatToken);
   app.use("/api/communities", communities);
   app.use("/api/data", data);
+  app.use("/api/departments", departments);
   app.use("/api/expoPushNotifications", expoPushNotifications);
   app.use("/api/expoPushTokens", expoPushTokens);
   app.use("/api/explore", explore);
