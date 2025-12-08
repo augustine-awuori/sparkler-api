@@ -1,35 +1,35 @@
 import Mailgen from "mailgen";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.EMAIL_PASS);
+const resend = new Resend("re_jZfGM1iA_JTGoVE2uq2oLzkPZ61wzwsfX");
 
 function generateHTMLEmail({ message }) {
-    const mailGenerator = new Mailgen({
-        theme: "default",
-        product: {
-            name: "Sparkler",
-            link: "https://sparkler.website/",
-            logo: "",
-        },
-    });
+  const mailGenerator = new Mailgen({
+    theme: "default",
+    product: {
+      name: "Sparkler",
+      link: "https://sparkler.website/",
+      logo: "",
+    },
+  });
 
-    return mailGenerator.generate({
-        body: {
-            name: "Sparkler",
-            intro: message,
-            outro: "Connect with ease!",
-        },
-    });
+  return mailGenerator.generate({
+    body: {
+      name: "Sparkler",
+      intro: message,
+      outro: "Connect with ease!",
+    },
+  });
 }
 
 export async function sendMail({ message, to, subject }) {
-    const htmlEmail = generateHTMLEmail({ message });
+  const htmlEmail = generateHTMLEmail({ message });
 
-    return await resend.emails.send({
-        from: "Sparkler@sparkler.website",
-        to,
-        subject,
-        html: generateHTMLEmail({ message }),
-        text: htmlEmail ? "" : `Hello, ${message}`,
-    });
+  return await resend.emails.send({
+    from: "Sparkler@sparkler.website",
+    to,
+    subject,
+    html: generateHTMLEmail({ message }),
+    text: htmlEmail ? "" : `Hello, ${message}`,
+  });
 }

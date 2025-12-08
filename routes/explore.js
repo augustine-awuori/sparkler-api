@@ -23,11 +23,8 @@ router.get("/", async (_req, res) => {
     const sparkleData = JSON.stringify(sparkles, null, 2); // Pretty-print for readability
     const prompt = `Generate a structured "For You" Explore Page JSON from these sparkles (posts). Follow the exact schema: {
   "forYouEdition": {
-    "date": "YYYY-MM-DD",
-    "totalSparklesProcessed": ${sparkles.length},
     "themes": [ ... ],  // Group into 3-5 themes with items (headline, teaser, etc.)
     "relevantPeople": [ ... ],  // Extract unique actors (SU:userId),
-    "hook": "Engaging closer string"
   }
 }. Use actor: "SU:userId" for authors. Make it witty & concise. Sparkles data: ${sparkleData}`;
 
@@ -70,6 +67,7 @@ router.post("/themeSparkles", async (req, res) => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const sparkles = await Sparkle.find({ createdAt: { $gte: sevenDaysAgo } })
       .sort({ createdAt: -1 })
+      .limit(10)
       .lean();
 
     const apiKey = process.env.POE_API_KEY;
