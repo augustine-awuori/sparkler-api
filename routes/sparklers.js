@@ -9,9 +9,8 @@ import { Sparkler } from "../models/sparkler.js";
 import auth from "../middlewares/auth.js";
 
 const client = new StreamClient(
-  process.env.NEW_FEED_API_KEY || "p4j79enx348e",
-  process.env.NEW_CHAT_API_SECRET ||
-    "wxsx8zxcaqbgpdp2r7rsve45edpsf3w7dujrs9grjuu68vs92hxvq9h6jwu6c5av"
+  process.env.NEW_FEED_API_KEY,
+  process.env.NEW_CHAT_API_SECRET
 );
 
 const router = express.Router();
