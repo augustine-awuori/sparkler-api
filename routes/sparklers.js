@@ -32,11 +32,28 @@ router.post("/auth-code/verify", async (req, res) => {
       .status(400)
       .send({ error: "Invalid username and/or authentication code." });
 
-  const { name, id, image, custom } = sparkler;
+  const { name, id, image } = sparkler;
   const feedToken = client.generateUserToken({
     user_id: id.toString(),
     validity_in_seconds: 365 * 24 * 60 * 60, // 1 yr ahead
   });
+
+  try {
+    await client.feeds.getOrCreateFeed({
+      feed_group_id: "user",
+      feed_id: sparkler.id,
+    });
+    await client.feeds.getOrCreateFeed({
+      feed_group_id: "timeline",
+      feed_id: sparkler.id,
+    });
+    await client.feeds.getOrCreateFeed({
+      feed_group_id: "notification",
+      feed_id: sparkler.id,
+    });
+  } catch (error) {
+    console.error(`Error initializing feeds`);
+  }
 
   if (sparkler.custom.invalid) {
     await client.upsertUsers([
@@ -122,6 +139,22 @@ router.post("/", async (req, res) => {
         custom: { ...sparkler.custom },
       },
     ]);
+    try {
+      await client.feeds.getOrCreateFeed({
+        feed_group_id: "user",
+        feed_id: sparkler.id,
+      });
+      await client.feeds.getOrCreateFeed({
+        feed_group_id: "timeline",
+        feed_id: sparkler.id,
+      });
+      await client.feeds.getOrCreateFeed({
+        feed_group_id: "notification",
+        feed_id: sparkler.id,
+      });
+    } catch (error) {
+      console.error(`Error initializing feeds :${error}`);
+    }
 
     const token = sparkler.generateAuthToken();
     res.header("x-auth-token", token).send(token);
