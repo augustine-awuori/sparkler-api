@@ -9,6 +9,10 @@ export const Alumni = mongoose.model(
       required: true,
       trim: true,
     },
+    phone: {
+      type: String,
+      trim: true,
+    },
     course: {
       type: String,
       required: true,
