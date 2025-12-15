@@ -6,11 +6,7 @@ import { StreamChat } from "stream-chat";
 
 import { findUniqueUsername, getUserFeedToken } from "../services/users.js";
 import { createOrGetUser, getClient } from "../utils/func.js";
-import {
-  User,
-  validateUser,
-  validateUserWithGoogleAccount,
-} from "../models/user.js";
+import { User, validateUserWithGoogleAccount } from "../models/user.js";
 import auth from "../middlewares/auth.js";
 import admin from "../middlewares/admin.js";
 import validate from "../middlewares/validate.js";

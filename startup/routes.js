@@ -23,6 +23,7 @@ import projects from "../routes/projects.js";
 import reactions from "../routes/reactions.js";
 import reports from "../routes/reports.js";
 import sparkleFromPDF from "../routes/sparkleFromPDF.js";
+import sparklers from "../routes/sparklers.js";
 import sparkles from "../routes/sparkles.js";
 import users from "../routes/users.js";
 
@@ -50,6 +51,7 @@ export default function (app) {
   app.use("/api/reactions", reactions);
   app.use("/api/reports", reports);
   app.use("/api/sparkleFromPDF", sparkleFromPDF);
+  app.use("/api/sparklers", sparklers);
   app.use("/api/sparkles", sparkles);
   app.use("/api/users", users);
   app.use(error);
