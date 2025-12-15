@@ -9,8 +9,9 @@ import { Sparkler } from "../models/sparkler.js";
 import auth from "../middlewares/auth.js";
 
 const client = new StreamClient(
-  process.env.NEW_FEED_API_KEY,
-  process.env.NEW_CHAT_API_SECRET
+  process.env.NEW_FEED_API_KEY || "p4j79enx348e",
+  process.env.NEW_CHAT_API_SECRET ||
+    "wxsx8zxcaqbgpdp2r7rsve45edpsf3w7dujrs9grjuu68vs92hxvq9h6jwu6c5av"
 );
 
 const router = express.Router();
@@ -36,16 +37,19 @@ router.post("/auth-code/verify", async (req, res) => {
     user_id: id.toString(),
     validity_in_seconds: 365 * 24 * 60 * 60, // 1 yr ahead
   });
-  await client.upsertUsers([
-    {
-      id,
-      name,
-      image,
-      custom: { ...custom, feedToken, invalid: false },
-    },
-  ]);
-  sparkler.custom = { ...sparkler.custom, feedToken, invalid: false };
 
+  if (sparkler.custom.invalid) {
+    await client.upsertUsers([
+      {
+        id,
+        name,
+        image,
+        custom: { feedToken, invalid: false },
+      },
+    ]);
+  }
+
+  sparkler.custom = { ...sparkler.custom, feedToken, invalid: false };
   sparkler.authCode = "";
   await sparkler.save();
 
