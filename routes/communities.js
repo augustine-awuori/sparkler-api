@@ -1,150 +1,227 @@
 import express from "express";
 import mongoose from "mongoose";
+import { StreamClient } from "@stream-io/node-sdk";
 
 import { Community, validateCommunity } from "../models/community.js";
-import { getClient } from "../utils/func.js";
-import { User } from "../models/user.js";
+import { Sparkler } from "../models/sparkler.js";
 import auth from "../middlewares/auth.js";
 import sendPushNotification from "../utils/pushNotifications.js";
 import validate from "../middlewares/validate.js";
 
+const client = new StreamClient(
+  process.env.NEW_FEED_API_KEY,
+  process.env.NEW_CHAT_API_SECRET
+);
+
 const router = express.Router();
 
 router.post("/", [auth, validate(validateCommunity)], async (req, res) => {
-    const community = new Community({
-        members: [req.user._id.toString()],
-        creator: req.user._id,
-        ...req.body,
-    });
+  try {
+    const userId = req.user.id.toString();
 
+    const community = new Community({ creator: req.user.id, ...req.body });
+    community.members = [userId];
     await community.save();
 
-    res.send(community);
+    const communityLevel = await client.feeds.createMembershipLevel({
+      id: community._id.toString(),
+      name: community.name,
+      description: community.bio,
+      custom: {
+        isVerified: community.isVerified,
+        whatsapp: community.whatsapp,
+        instagram: community.instagram,
+        youtube: community.youtube,
+        customLink: community.customLink,
+        profileImage: community.profileImage,
+        creator_id: userId,
+      },
+      priority: 100,
+      tags: [community._id.toString()],
+    });
+
+    await client.feeds.updateFeedMembers({
+      feed_group_id: "user",
+      feed_id: userId,
+      operation: "upsert",
+      members: [{ user_id: userId, membership_level: communityLevel.id }],
+    });
+
+    res.send(communityLevel);
+  } catch (error) {
+    console.error(`Error creating a community level: ${error}`);
+    res.status(500).send({ error: "Error creating a community level" });
+  }
 });
 
 router.get("/", async (_req, res) => {
-    const communities = await Community.find({}).sort("_id");
+  const communities = await Community.find({}).sort("_id");
 
-    res.send(communities);
+  res.send(communities);
 });
 
 router.get("/:communityId", async (_req, res) => {
-    const community = await Community.findById(req.params.communityId);
+  const community = await Community.findById(req.params.communityId);
 
-    community
-        ? res.send(community)
-        : res.status(404).send({ error: "Community not found!" });
+  community
+    ? res.send(community)
+    : res.status(404).send({ error: "Community not found!" });
 });
 
-router.post("/sparkles/:communityId", async (req, res) => {
-    const client = getClient();
-    if (!client)
-        return res.status(500).send({ error: "Failed to initialize client" });
-
-    const response = await client
-        .feed("communities", req.params.communityId)
-        .get({
-            enrich: true,
-            ownReactions: true,
-            withOwnChildren: true,
-            withOwnReactions: true,
-            withRecentReactions: true,
-            withReactionCounts: true,
-            ...req.body,
-        });
-
-    response
-        ? res.send(response.results)
-        : res.status(500).send({ error: "Error fetching community sparkles!" });
-});
-
-router.get("/sparkles/:communityId", async (req, res) => {
-    const client = getClient();
-    if (!client)
-        return res.status(500).send({ error: "Failed to initialize client" });
-
-    const response = await client
-        .feed("communities", req.params.communityId)
-        .get({
-            enrich: true,
-            ownReactions: true,
-            withOwnChildren: true,
-            withOwnReactions: true,
-            withRecentReactions: true,
-            withReactionCounts: true,
-        });
-
-    response
-        ? res.send(response.results)
-        : res.status(500).send({ error: "Error fetching community sparkles!" });
+router.get("/levels", async (req, res) => {
+  try {
+    const levels = await client.feeds.queryMembershipLevels({
+      filter: {
+        custom: {
+          $contains: { ...req.body },
+        },
+      },
+      sort: [{ field: "priority", direction: -1 }],
+    });
+    res.send(levels);
+  } catch (error) {
+    console.error(`Error fetching community levels: ${error}`);
+    res.status(500).send({ error: "Error fetching community levels" });
+  }
 });
 
 router.patch("/:communityId/join", auth, async (req, res) => {
+  try {
     const { communityId } = req.params;
-    const userId = req.user._id;
+    const userId = req.user.id;
 
     if (!mongoose.isValidObjectId(userId))
-        return res.status(400).send({ error: "Invalid user id" });
+      return res.status(400).send({ error: "Invalid user id" });
 
-    const user = await User.findById(userId);
+    const user = await Sparkler.findById(userId);
     if (!user)
-        return res
-            .status(404)
-            .send({ error: "User does not exist in the database!" });
+      return res
+        .status(404)
+        .send({ error: "User does not exist in the database!" });
 
     const community = await Community.findById(communityId).populate("creator");
     if (!community)
-        return res
-            .status(404)
-            .send({ error: "Community does not exist in the database!" });
+      return res
+        .status(404)
+        .send({ error: "Community does not exist in the database!" });
 
-    const creatorExpoPushToken = community.creator?.expoPushToken?.data;
-    if (creatorExpoPushToken)
-        sendPushNotification(creatorExpoPushToken, {
-            message: `${user.name} joined your community`,
-            title: `New member`,
-        });
-    user.communities = Array.from(new Set(user.communities).add(communityId));
-    await user.save();
-    community.members = Array.from(new Set(community.members).add(userId));
+    community.members = new Set(community.members).add(userId).toArray();
     await community.save();
 
+    await client.feeds.updateFeedMembers({
+      feed_group_id: "user",
+      feed_id: userId.toString(),
+      operation: "upsert",
+      members: [{ user_id: userId.toString(), membership_level: communityId }],
+    });
+
+    const { creator } = community;
+    const creatorExpoPushToken = creator?.custom?.expoPushToken?.data;
+    if (creatorExpoPushToken)
+      sendPushNotification(creatorExpoPushToken, {
+        message: `${user.name} is now a member of your community`,
+        title: community.name,
+      });
+
     res.send(community);
+  } catch (error) {
+    console.error(`Error joining a community: ${error}`);
+    res.status(500).send({ error: "Error joining a community" });
+  }
 });
 
 router.patch("/:communityId", auth, async (req, res) => {
+  try {
     const { communityId } = req.params;
-
     const community = await Community.findById(communityId);
     if (!community)
-        return res
-            .status(404)
-            .send({ error: "Community does not exist in the database!" });
+      return res
+        .status(404)
+        .send({ error: "Community does not exist in the database!" });
+
+    const {
+      name,
+      bio,
+      isVerified,
+      whatsapp,
+      instagram,
+      youtube,
+      customLink,
+      profileImage,
+    } = req.body;
+    await client.feeds.updateMembershipLevel({
+      id: communityId,
+      name: name || community.name,
+      description: bio || community.bio,
+      custom: {
+        isVerified: isVerified || community.isVerified,
+        whatsapp: whatsapp || community.whatsapp,
+        instagram: instagram || community.instagram,
+        youtube: youtube || community.youtube,
+        customLink: customLink || community.customLink,
+        profileImage: profileImage || community.profileImage,
+      },
+    });
 
     const updated = await Community.findByIdAndUpdate(communityId, req.body, {
-        new: true,
+      new: true,
     });
     updated
-        ? res.send(updated)
-        : res.status(500).send({ error: "Something failed to update community" });
+      ? res.send(updated)
+      : res.status(500).send({ error: "Something failed to update community" });
+  } catch (error) {
+    console.error(`Error updating community ${error}`);
+    res.status(500).send({ error: "Error updating community" });
+  }
 });
 
 router.delete("/:communityId", auth, async (req, res) => {
+  try {
     const { communityId } = req.params;
-
     const community = await Community.findById(communityId);
     if (!community)
-        return res
-            .status(404)
-            .send({ error: "Community does not exist in the database!" });
+      return res
+        .status(404)
+        .send({ error: "Community does not exist in the database!" });
 
-    if (community.creator.toString() !== req.user._id.toString())
-        return res.status(401).send({ error: "You are not the community creator" });
+    if (community.creator.toString() !== userId)
+      return res
+        .status(401)
+        .send({ error: "You are not the community creator" });
+
+    await client.feeds.deleteMembershipLevel({ id: communityId });
 
     const deleted = await Community.findByIdAndDelete(communityId);
     deleted
-        ? res.send(deleted)
-        : res.status(500).send({ error: "Something failed" });
+      ? res.send(deleted)
+      : res.status(500).send({ error: "Something failed" });
+  } catch (error) {
+    console.error(`Error deleting community ${error}`);
+    res.status(500).send({ error: "Error deleting community" });
+  }
+});
+
+router.patch("/:communityId/leave", auth, async (req, res) => {
+  try {
+    const { communityId } = req.params;
+    const community = await Community.findById(communityId);
+    if (!community)
+      return res
+        .status(404)
+        .send({ error: "Community does not exist in the database!" });
+
+    const userId = req.user.id.toString();
+    await client.feeds.updateFeedMembers({
+      feed_group_id: "user",
+      feed_id: userId,
+      operation: "remove",
+      members: [{ user_id: userId, membership_level: communityId }],
+    });
+    res.send({ message: "Left the community successfully" });
+  } catch (error) {
+    console.error(`Error leaving a community: ${error}`);
+    res.status(500).send({ error: "Error leaving a community" });
+  }
 });
 
 export default router;
