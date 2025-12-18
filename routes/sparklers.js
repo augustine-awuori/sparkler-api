@@ -32,27 +32,7 @@ router.post("/auth-code/verify", async (req, res) => {
       .send({ error: "Invalid username and/or authentication code." });
 
   const { name, id, image } = sparkler;
-  const feedToken = client.generateUserToken({
-    user_id: id.toString(),
-    validity_in_seconds: 365 * 24 * 60 * 60, // 1 yr ahead
-  });
-
-  // try {
-  //   await client.feeds.getOrCreateFeed({
-  //     feed_group_id: "user",
-  //     feed_id: sparkler.id,
-  //   });
-  //   await client.feeds.getOrCreateFeed({
-  //     feed_group_id: "timeline",
-  //     feed_id: sparkler.id,
-  //   });
-  //   await client.feeds.getOrCreateFeed({
-  //     feed_group_id: "notification",
-  //     feed_id: sparkler.id,
-  //   });
-  // } catch (error) {
-  //   console.error(`Error initializing feeds`);
-  // }
+  const feedToken = createUserToken(id);
 
   if (sparkler.custom.invalid) {
     await client.upsertUsers([
@@ -121,7 +101,7 @@ router.post("/", async (req, res) => {
         .status(400)
         .send({ error: "Invalid username and/or auth code." });
 
-    const feedToken = client.generateUserToken({ id: sparkler._id.toString() });
+    const feedToken = createUserToken(sparkler.id);
     sparkler.name = name;
     sparkler.custom = {
       email,
@@ -138,22 +118,6 @@ router.post("/", async (req, res) => {
         custom: { ...sparkler.custom },
       },
     ]);
-    // try {
-    //   await client.feeds.getOrCreateFeed({
-    //     feed_group_id: "user",
-    //     feed_id: sparkler.id,
-    //   });
-    //   await client.feeds.getOrCreateFeed({
-    //     feed_group_id: "timeline",
-    //     feed_id: sparkler.id,
-    //   });
-    //   await client.feeds.getOrCreateFeed({
-    //     feed_group_id: "notification",
-    //     feed_id: sparkler.id,
-    //   });
-    // } catch (error) {
-    //   console.error(`Error initializing feeds :${error}`);
-    // }
 
     const token = sparkler.generateAuthToken();
     res.header("x-auth-token", token).send(token);
@@ -172,11 +136,7 @@ router.get("/guest", async (req, res) => {
     .substr(2, 9)}`;
   const guestNumber = Math.floor(Math.random() * 9999) + 1;
   const guestName = `Guest${guestNumber}`;
-
-  const feedToken = client.generateUserToken({
-    user_id: guestId,
-    validity_in_seconds: 24 * 60 * 60,
-  });
+  const feedToken = createUserToken(guestId, 1);
 
   const guest = await client.createGuest({
     user: {
@@ -225,3 +185,10 @@ router.patch("/", auth, async (req, res) => {
 });
 
 export default router;
+
+function createUserToken(userId, days = 365) {
+  return client.generateUserToken({
+    id: userId.toString(),
+    validity_in_seconds: days * 24 * 60 * 60,
+  });
+}
