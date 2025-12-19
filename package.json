@@ -12,7 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@stream-io/node-sdk": "^0.7.26",
+    "@stream-io/node-sdk": "^0.7.28",
     "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",

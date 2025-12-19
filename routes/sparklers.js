@@ -32,7 +32,7 @@ router.post("/auth-code/verify", async (req, res) => {
       .send({ error: "Invalid username and/or authentication code." });
 
   const { name, id, image } = sparkler;
-  const feedToken = createUserToken(id);
+  const feedToken = createUserToken(id.toString());
 
   if (sparkler.custom.invalid) {
     await client.upsertUsers([
@@ -40,7 +40,7 @@ router.post("/auth-code/verify", async (req, res) => {
         id,
         name,
         image,
-        custom: { feedToken, invalid: false },
+        custom: { invalid: false },
       },
     ]);
   }
@@ -188,7 +188,7 @@ export default router;
 
 function createUserToken(userId, days = 365) {
   return client.generateUserToken({
-    id: userId.toString(),
+    user_id: userId.toString(),
     validity_in_seconds: days * 24 * 60 * 60,
   });
 }
