@@ -23,31 +23,7 @@ router.post("/", [auth, validate(validateCommunity)], async (req, res) => {
     community.members = [userId];
     await community.save();
 
-    const communityLevel = await client.feeds.createMembershipLevel({
-      id: community._id.toString(),
-      name: community.name,
-      description: community.bio,
-      custom: {
-        isVerified: community.isVerified,
-        whatsapp: community.whatsapp,
-        instagram: community.instagram,
-        youtube: community.youtube,
-        customLink: community.customLink,
-        profileImage: community.profileImage,
-        creator_id: userId,
-      },
-      priority: 100,
-      tags: [community._id.toString()],
-    });
-
-    await client.feeds.updateFeedMembers({
-      feed_group_id: "user",
-      feed_id: userId,
-      operation: "upsert",
-      members: [{ user_id: userId, membership_level: communityLevel.id }],
-    });
-
-    res.send(communityLevel);
+    res.send(community);
   } catch (error) {
     console.error(`Error creating a community level: ${error}`);
     res.status(500).send({ error: "Error creating a community level" });
@@ -108,13 +84,6 @@ router.patch("/:communityId/join", auth, async (req, res) => {
     community.members = new Set(community.members).add(userId).toArray();
     await community.save();
 
-    await client.feeds.updateFeedMembers({
-      feed_group_id: "user",
-      feed_id: userId.toString(),
-      operation: "upsert",
-      members: [{ user_id: userId.toString(), membership_level: communityId }],
-    });
-
     const { creator } = community;
     const creatorExpoPushToken = creator?.custom?.expoPushToken?.data;
     if (creatorExpoPushToken)
@@ -138,30 +107,6 @@ router.patch("/:communityId", auth, async (req, res) => {
       return res
         .status(404)
         .send({ error: "Community does not exist in the database!" });
-
-    const {
-      name,
-      bio,
-      isVerified,
-      whatsapp,
-      instagram,
-      youtube,
-      customLink,
-      profileImage,
-    } = req.body;
-    await client.feeds.updateMembershipLevel({
-      id: communityId,
-      name: name || community.name,
-      description: bio || community.bio,
-      custom: {
-        isVerified: isVerified || community.isVerified,
-        whatsapp: whatsapp || community.whatsapp,
-        instagram: instagram || community.instagram,
-        youtube: youtube || community.youtube,
-        customLink: customLink || community.customLink,
-        profileImage: profileImage || community.profileImage,
-      },
-    });
 
     const updated = await Community.findByIdAndUpdate(communityId, req.body, {
       new: true,
