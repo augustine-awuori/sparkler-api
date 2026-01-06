@@ -154,7 +154,7 @@ router.get("/guest", async (req, res) => {
 
 router.patch("/", auth, async (req, res) => {
   try {
-    const user = await Sparkler.findByIdAndUpdate(req.user._id, req.body, {
+    const user = await Sparkler.findByIdAndUpdate(req.user.id, req.body, {
       new: true,
     });
 
@@ -166,7 +166,7 @@ router.patch("/", auth, async (req, res) => {
     const { name, username, image, coverImage, verified, isAdmin } = user;
     const response = await client.upsertUsers([
       {
-        id: req.user._id,
+        id: req.user.id,
         custom: { coverImage, verified, isAdmin, username },
         name,
         image,
