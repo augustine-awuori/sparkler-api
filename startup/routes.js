@@ -20,6 +20,7 @@ import hashtags from "../routes/hashtags.js";
 import issues from "../routes/issues.js";
 import mails from "../routes/mails.js";
 import projects from "../routes/projects.js";
+import pushTokens from "../routes/pushTokens.js";
 import reactions from "../routes/reactions.js";
 import reports from "../routes/reports.js";
 import sparkleFromPDF from "../routes/sparkleFromPDF.js";
@@ -48,6 +49,7 @@ export default function (app) {
   app.use("/api/issues", issues);
   app.use("/api/mails", mails);
   app.use("/api/projects", projects);
+  app.use("/api/push-tokens", pushTokens);
   app.use("/api/reactions", reactions);
   app.use("/api/reports", reports);
   app.use("/api/sparkleFromPDF", sparkleFromPDF);
