@@ -10,7 +10,7 @@ import validate from "../middlewares/validate.js";
 
 const client = new StreamClient(
   process.env.NEW_FEED_API_KEY,
-  process.env.NEW_CHAT_API_SECRET
+  process.env.NEW_CHAT_API_SECRET,
 );
 
 const router = express.Router();
@@ -81,7 +81,7 @@ router.patch("/:communityId/join", auth, async (req, res) => {
         .status(404)
         .send({ error: "Community does not exist in the database!" });
 
-    community.members = new Set(community.members).add(userId).toArray();
+    community.members = Array.from(new Set(community.members).add(userId));
     await community.save();
 
     const { creator } = community;
