@@ -36,7 +36,7 @@ router.get("/", async (_req, res) => {
   res.send(communities);
 });
 
-router.get("/:communityId", async (_req, res) => {
+router.get("/:communityId", async (req, res) => {
   const community = await Community.findById(req.params.communityId);
 
   community
