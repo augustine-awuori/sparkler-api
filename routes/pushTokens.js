@@ -15,8 +15,12 @@ router.post("/", auth, async (req, res) => {
     if (!userId || !pushToken)
       return res.status(400).json({ error: "Missing user ID or token" });
 
-    if (!Expo.isExpoPushToken(pushToken))
-      return res.status(400).send({ error: "Invalid push token" });
+    try {
+      if (!Expo.isExpoPushToken(pushToken))
+        return res.status(400).send({ error: "Invalid push token" });
+    } catch (error) {
+      console.error("Error vlidating a push token " + error);
+    }
 
     const found = await PushToken.findOne({ userId });
     found
