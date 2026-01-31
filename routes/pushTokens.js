@@ -1,4 +1,5 @@
 import express from "express";
+import Expo from "expo-server-sdk";
 
 import { PushToken } from "../models/pushToken.js";
 import { sendPushNotificationTo } from "./expoPushNotifications.js";
@@ -13,6 +14,9 @@ router.post("/", auth, async (req, res) => {
 
     if (!userId || !pushToken)
       return res.status(400).json({ error: "Missing user ID or token" });
+
+    if (!Expo.isExpoPushToken(pushToken))
+      return res.status(400).send({ error: "Invalid push token" });
 
     const found = await PushToken.findOne({ userId });
     found
