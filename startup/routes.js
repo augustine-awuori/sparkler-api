@@ -49,7 +49,7 @@ export default function (app) {
   app.use("/api/issues", issues);
   app.use("/api/mails", mails);
   app.use("/api/projects", projects);
-  app.use("/api/push-tokens", pushTokens);
+  app.use("/api/pushTokens", pushTokens);
   app.use("/api/reactions", reactions);
   app.use("/api/reports", reports);
   app.use("/api/sparkleFromPDF", sparkleFromPDF);
