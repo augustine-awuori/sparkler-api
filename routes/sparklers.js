@@ -10,7 +10,7 @@ import auth from "../middlewares/auth.js";
 
 const client = new StreamClient(
   process.env.NEW_FEED_API_KEY,
-  process.env.NEW_CHAT_API_SECRET
+  process.env.NEW_CHAT_API_SECRET,
 );
 
 const router = express.Router();
@@ -53,6 +53,33 @@ router.post("/auth-code/verify", async (req, res) => {
   res.header("x-auth-token", token).send(token);
 });
 
+router.post("/auth-google", async (req, res) => {
+  try {
+    const { email, name, image = "" } = req.body;
+
+    if (!email || !name)
+      return res.status(400).send({ error: "Name and email are required" });
+
+    let sparkler = await Sparkler.findOne({ email });
+    if (!sparkler) {
+      const username = await findUniqueUsername(name);
+      await client.upsertUsers([
+        { id: sparkler._id.toString(), image, name, custom: { username } },
+      ]);
+      sparkler = new Sparkler({ email, name, image });
+      const feedToken = createUserToken(sparkler._id.toString());
+      sparkler.custom = { username, feedToken };
+      await sparkler.save();
+    }
+
+    const token = sparkler.generateAuthToken();
+    res.header("x-auth-token", token).send(token);
+  } catch (error) {
+    console.error(`Error loggin user with google: ${error}`);
+    res.status(500).send({ error: "Error loggin with google " + error });
+  }
+});
+
 router.post("/auth-code", async (req, res) => {
   const { email } = req.body;
 
@@ -93,7 +120,7 @@ router.post("/", async (req, res) => {
 
     const isValidAuthCode = await bcrypt.compare(
       authCode.toString(),
-      sparkler.authCode
+      sparkler.authCode,
     );
 
     if (!isValidAuthCode)
@@ -154,20 +181,23 @@ router.get("/guest", async (req, res) => {
 
 router.patch("/", auth, async (req, res) => {
   try {
+    console.log("Starting...", req.body);
     const user = await Sparkler.findByIdAndUpdate(req.user.id, req.body, {
       new: true,
     });
+    console.log("user", user);
 
     if (!user)
       return res
         .status(404)
         .send({ error: "User does not exist in the database" });
 
-    const { name, username, image, coverImage, verified, isAdmin } = user;
+    const { name, username, image, coverImage, verified, isAdmin, ...other } =
+      user;
     const response = await client.upsertUsers([
       {
         id: req.user.id,
-        custom: { coverImage, verified, isAdmin, username },
+        custom: { coverImage, verified, isAdmin, username, ...other },
         name,
         image,
       },
