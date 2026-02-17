@@ -16,7 +16,7 @@ const client = new StreamClient(
 const router = express.Router();
 
 router.post("/auth-code/verify", async (req, res) => {
-  const { email, authCode } = req.body;
+  const { email, authCode, username, name: newUserName } = req.body;
   if (!authCode)
     return res.status(400).send({ error: "Auth code not provided" });
 
@@ -40,9 +40,19 @@ router.post("/auth-code/verify", async (req, res) => {
         id,
         name,
         image,
-        custom: { invalid: false },
+        custom: {
+          ...sparkler.custom,
+          invalid: false,
+          username: username
+            ? await findUniqueUsername(username)
+            : sparkler.custom.username,
+          feedToken,
+        },
       },
     ]);
+    if (username)
+      sparkler.custom.username = await findUniqueUsername(username || name);
+    if (newUserName) sparkler.name = newUserName || name;
   }
 
   sparkler.custom = { ...sparkler.custom, feedToken, invalid: false };
