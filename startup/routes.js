@@ -27,6 +27,7 @@ import sparkleFromPDF from "../routes/sparkleFromPDF.js";
 import sparklers from "../routes/sparklers.js";
 import sparkles from "../routes/sparkles.js";
 import users from "../routes/users.js";
+import verifications from "../routes/verifications.js";
 
 export default function (app) {
   app.use(express.json());
@@ -56,5 +57,6 @@ export default function (app) {
   app.use("/api/sparklers", sparklers);
   app.use("/api/sparkles", sparkles);
   app.use("/api/users", users);
+  app.use("/api/verifications", verifications);
   app.use(error);
 }
