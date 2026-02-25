@@ -96,7 +96,7 @@ router.post("/auth-code", async (req, res) => {
   let user = await Sparkler.findOne({ email });
   const authCode = getAuthCode();
   const salt = await bcrypt.genSalt(10);
-  console.log("auth code: ", authCode);
+
   const hashedAuthCode = await bcrypt.hash(authCode.toString(), salt);
 
   if (!user) {
@@ -191,11 +191,9 @@ router.get("/guest", async (req, res) => {
 
 router.patch("/", auth, async (req, res) => {
   try {
-    console.log("Starting...", req.body);
     const user = await Sparkler.findByIdAndUpdate(req.user.id, req.body, {
       new: true,
     });
-    console.log("user", user);
 
     if (!user)
       return res
