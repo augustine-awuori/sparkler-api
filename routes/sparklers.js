@@ -202,15 +202,9 @@ router.patch("/", auth, async (req, res) => {
         .status(404)
         .send({ error: "User does not exist in the database" });
 
-    const { name, username, image, coverImage, verified, isAdmin, ...other } =
-      user;
+    const { name, custom, image } = user;
     const response = await client.upsertUsers([
-      {
-        id: req.user.id,
-        custom: { coverImage, verified, isAdmin, username, ...other },
-        name,
-        image,
-      },
+      { id: user._id.toString(), custom: { ...custom }, name, image },
     ]);
 
     response
