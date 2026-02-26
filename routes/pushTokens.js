@@ -56,7 +56,7 @@ router.post("/send-to-one", auth, async (req, res) => {
 
 router.post("/send-to-many", auth, async (req, res) => {
   try {
-    const { userIds, message, title } = req.body;
+    const { userIds, message, title, ...other } = req.body;
     if (!userIds || !Array.isArray(userIds) || !message)
       return res.status(400).json({ error: "Missing user ID or message" });
 
@@ -64,7 +64,7 @@ router.post("/send-to-many", auth, async (req, res) => {
 
     sendPushNotificationTo(
       tokens.map((token) => token.pushToken),
-      { message, title },
+      { message, title, ...other },
     );
     res.send({ success: true });
   } catch (error) {
