@@ -1,34 +1,36 @@
 import express from "express";
 
 import { sendMail } from "../services/mail.js";
-import { User } from "../models/user.js";
+import { Sparkler } from "../models/sparkler.js";
 import admin from "../middlewares/admin.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
 
 router.post("/all", [auth, admin], async (req, res) => {
-    const { subject, message } = req.body;
+  const { subject, message } = req.body;
 
-    const emails = (await User.find({})).map((user) => user.email);
-    const { data, error } = await sendMail({ to: emails, message, subject });
+  const emails = (await Sparkler.find({})).map((user) => user.email);
+  const { data, error } = await sendMail({ to: emails, message, subject });
 
-    data
-        ? res.send({ message: "Email sent" })
-        : res.status(500).send({ error: error || "Something failed while sending email" });
+  data
+    ? res.send({ message: "Email sent" })
+    : res
+        .status(500)
+        .send({ error: error || "Something failed while sending email" });
 });
 
 router.post("/incomplete", [auth, admin], async (_req, res) => {
-    const emails = (await User.find({}))
-        .filter((user) => user.authCode)
-        .map((user) => user.email);
+  const emails = (await Sparkler.find({}))
+    .filter((user) => user.authCode)
+    .map((user) => user.email);
 
-    if (!emails.length)
-        return res.status(201).send({ message: "No incomplete registrations" });
+  if (!emails.length)
+    return res.status(201).send({ message: "No incomplete registrations" });
 
-    const subject =
-        "Reminder: Use Your Sparkler Auth Code & App Update Available";
-    const message = `
+  const subject =
+    "Reminder: Use Your Sparkler Auth Code & App Update Available";
+  const message = `
 We noticed that you requested an authentication code but haven’t used it yet.  
 To access your Sparkler account, please use the code sent in the previous email.  
 If the code has expired or you no longer have it, you can request a new one.  
@@ -38,22 +40,22 @@ With Auth Code at Sparkler, we're going passwordless—you don't need to remembe
 Additionally, we have an update available on the Play Store with new features and improvements.  
 Make sure to update your app for the best experience.
 `;
-    const { data } = await sendMail({ to: emails, message, subject });
+  const { data } = await sendMail({ to: emails, message, subject });
 
-    data
-        ? res.send({ message: "Email sent" })
-        : res.status(500).send({ error: "Something failed while sending email" });
+  data
+    ? res.send({ message: "Email sent" })
+    : res.status(500).send({ error: "Something failed while sending email" });
 });
 
 router.post("/:email", [auth, admin], async (req, res) => {
-    const { subject, message } = req.body;
-    const { email } = req.params;
+  const { subject, message } = req.body;
+  const { email } = req.params;
 
-    const { data } = await sendMail({ to: email, message, subject });
+  const { data } = await sendMail({ to: email, message, subject });
 
-    data
-        ? res.send({ message: "Email sent" })
-        : res.status(500).send({ error: "Something failed while sending email" });
+  data
+    ? res.send({ message: "Email sent" })
+    : res.status(500).send({ error: "Something failed while sending email" });
 });
 
 export default router;

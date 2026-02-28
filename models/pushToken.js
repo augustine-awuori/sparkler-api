@@ -5,7 +5,7 @@ export const PushToken = mongoose.model(
   new mongoose.Schema({
     userId: {
       type: mongoose.Types.ObjectId,
-      ref: "User",
+      ref: "Sparkler",
       required: true,
       unique: true,
     },

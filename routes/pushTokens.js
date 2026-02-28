@@ -2,7 +2,7 @@ import express from "express";
 import Expo from "expo-server-sdk";
 
 import { PushToken } from "../models/pushToken.js";
-import { sendPushNotificationTo } from "./expoPushNotifications.js";
+import { sendPushNotificationTo } from "../utils/pushNotifications.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();

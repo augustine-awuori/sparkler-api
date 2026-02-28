@@ -3,14 +3,14 @@ import bcrypt from "bcrypt";
 import express from "express";
 
 import { findUniqueUsername } from "../services/users.js";
-import { getAuthCode } from "../utils/func.js";
 import { sendMail } from "../services/mail.js";
 import { Sparkler } from "../models/sparkler.js";
 import auth from "../middlewares/auth.js";
 
 const client = new StreamClient(
-  process.env.NEW_FEED_API_KEY,
-  process.env.NEW_CHAT_API_SECRET,
+  process.env.NEW_FEED_API_KEY || "p4j79enx348e",
+  process.env.NEW_CHAT_API_SECRET ||
+    "wxsx8zxcaqbgpdp2r7rsve45edpsf3w7dujrs9grjuu68vs92hxvq9h6jwu6c5av",
 );
 
 const router = express.Router();
@@ -235,4 +235,8 @@ function createUserToken(userId, days = 365) {
     user_id: userId.toString(),
     validity_in_seconds: days * 24 * 60 * 60,
   });
+}
+
+function getAuthCode() {
+  return Math.floor(1000 + Math.random() * 9000);
 }

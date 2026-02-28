@@ -1,13 +1,6 @@
-import stream from "getstream";
 import { isValidObjectId } from "mongoose";
 
 import { Sparkler } from "../models/sparkler.js";
-
-export function getUserFeedToken(userId) {
-  return stream
-    .connect(process.env.feedApiKey, process.env.feedSecretKey)
-    .createUserToken(userId.toString());
-}
 
 function generateUsername(name) {
   return name.replace(/\s+/g, "").toLowerCase();
