@@ -1,13 +1,14 @@
 import { Expo } from "expo-server-sdk";
 
-export function sendPushNotificationTo(
+export async function sendPushNotificationTo(
   usersToken = [],
   { message, title, ...otherData },
 ) {
-  usersToken.forEach(async (token) => {
-    if (Expo.isExpoPushToken(token))
-      await sendPushNotification(token, { message, title, ...otherData });
-  });
+  try {
+    await sendPushNotification(usersToken, { message, title, ...otherData });
+  } catch (error) {
+    console.error(`Error sending push notifications: ${error}`);
+  }
 }
 
 async function sendPushNotification(
