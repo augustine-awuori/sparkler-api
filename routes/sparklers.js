@@ -5,12 +5,12 @@ import express from "express";
 import { findUniqueUsername } from "../services/users.js";
 import { sendMail } from "../services/mail.js";
 import { Sparkler } from "../models/sparkler.js";
+import admin from "../middlewares/admin.js";
 import auth from "../middlewares/auth.js";
 
 const client = new StreamClient(
-  process.env.NEW_FEED_API_KEY || "p4j79enx348e",
-  process.env.NEW_CHAT_API_SECRET ||
-    "wxsx8zxcaqbgpdp2r7rsve45edpsf3w7dujrs9grjuu68vs92hxvq9h6jwu6c5av",
+  process.env.NEW_FEED_API_KEY,
+  process.env.NEW_CHAT_API_SECRET,
 );
 
 const router = express.Router();
@@ -75,6 +75,29 @@ router.post("/auth-google", async (req, res) => {
     if (!email || !name)
       return res.status(400).send({ error: "Name and email are required" });
 
+    let sparkler = await Sparkler.findOne({ email });
+    if (!sparkler) {
+      const username = await findUniqueUsername(name);
+      await client.upsertUsers([
+        { id: sparkler._id.toString(), image, name, custom: { username } },
+      ]);
+      sparkler = new Sparkler({ email, name, image });
+      const feedToken = createUserToken(sparkler._id.toString());
+      sparkler.custom = { username, feedToken };
+      await sparkler.save();
+    }
+
+    const token = sparkler.generateAuthToken();
+    res.header("x-auth-token", token).send(token);
+  } catch (error) {
+    console.error(`Error loggin user with google: ${error}`);
+    res.status(500).send({ error: "Error loggin with google " + error });
+  }
+});
+
+router.post("/quick", async (req, res) => {
+  try {
+    const { email, image, name } = req.body;
     let sparkler = await Sparkler.findOne({ email });
     if (!sparkler) {
       const username = await findUniqueUsername(name);
@@ -225,6 +248,65 @@ router.patch("/", auth, async (req, res) => {
   } catch (error) {
     console.error(`Error updating user ${error}`);
     res.status(500).send({ error });
+  }
+});
+
+router.patch("/sync", [auth, admin], async (_req, res) => {
+  try {
+    const sparklers = (await Sparkler.find({})).map(
+      ({
+        id,
+        name,
+        image,
+        custom: { email, verified, isAdmin, username, invalid },
+      }) => ({
+        id,
+        name,
+        image,
+        custom: { email, verified, isAdmin, username, invalid },
+      }),
+    );
+
+    if (sparklers.length === 0) {
+      return res.status(200).json({ message: "No users to sync", updated: 0 });
+    }
+
+    const BATCH_SIZE = 100;
+    const results = [];
+    let totalUpdated = 0;
+
+    // Process in batches
+    for (let i = 0; i < sparklers.length; i += BATCH_SIZE) {
+      const batch = sparklers.slice(i, i + BATCH_SIZE);
+
+      try {
+        const batchResponse = await client.upsertUsers(batch);
+        results.push(batchResponse); // or just collect summaries if you prefer
+        totalUpdated += batch.length;
+
+        console.log(
+          `Batch ${i / BATCH_SIZE + 1} successful - ${batch.length} users`,
+        );
+      } catch (batchError) {
+        console.error(`Batch ${i / BATCH_SIZE + 1} failed:`, batchError);
+        // You can decide whether to continue or throw here
+        // Option A: continue with next batches
+        // Option B: throw to fail whole request
+      }
+    }
+
+    res.status(200).json({
+      message: "User sync completed",
+      totalUsers: sparklers.length,
+      processed: totalUpdated,
+      // results: results,          // ← uncomment only if you really need all responses
+    });
+  } catch (error) {
+    console.error(`Error during user sync: ${error}`);
+    res.status(500).json({
+      error: "Error syncing user information",
+      details: error.message,
+    });
   }
 });
 

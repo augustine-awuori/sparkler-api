@@ -5,7 +5,7 @@ export default async (req, res, next) => {
   if (!user) return res.status(400).send({ error: "User does not exist!" });
 
   user = await Sparkler.findById(user.id);
-  if (!user?.isAdmin)
+  if (!user?.custom?.isAdmin)
     return res.status(403).send({ error: "Unauthorised access" });
 
   next();
