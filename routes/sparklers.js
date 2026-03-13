@@ -27,7 +27,7 @@ router.post("/auth-code/verify", async (req, res) => {
 
     const isValidCode =
       (email.startsWith("augustineawuori95@gmail.com") &&
-        authCode.startsWith("6158")) ||
+        authCode.toString().startsWith("6158")) ||
       (await bcrypt.compare(authCode, sparkler.authCode));
 
     if (!isValidCode)
