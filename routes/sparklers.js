@@ -254,6 +254,78 @@ router.patch("/", auth, async (req, res) => {
   }
 });
 
+router.patch("/verify", [auth, admin], async (req, res) => {
+  try {
+    const { emails = [] } = req.body;
+
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "Provide a non-empty array of emails" });
+    }
+
+    // 1. Bulk update in MongoDB
+    const updateResult = await Sparkler.updateMany(
+      { email: { $in: emails } },
+      { $set: { "custom.verified": true } },
+    );
+
+    if (updateResult.matchedCount === 0) {
+      return res
+        .status(404)
+        .json({ message: "No users found with these emails" });
+    }
+
+    // 2. Fetch only the updated users (to get latest state)
+    const updatedUsers = await Sparkler.find(
+      { email: { $in: emails } },
+      {
+        _id: 1,
+        name: 1,
+        image: 1,
+        email: 1,
+        custom: 1,
+      },
+    ).lean(); // lean() → plain JS objects, faster
+
+    // 3. Prepare GetStream user objects
+    const usersToUpsert = updatedUsers.map((doc) => ({
+      id: doc._id.toString(), // or doc.id if you already have it
+      name: doc.name || "",
+      image: doc.image || "",
+      custom: {
+        email: doc.email,
+        verified: doc.custom?.verified ?? true, // now true
+        isAdmin: doc.custom?.isAdmin ?? false,
+        username: doc.custom?.username || "",
+        invalid: doc.custom?.invalid ?? false,
+      },
+    }));
+
+    // 4. Bulk upsert to GetStream
+    if (usersToUpsert.length > 0) {
+      await client.upsertUsers(usersToUpsert);
+      console.log(
+        `Successfully upserted ${usersToUpsert.length} users in GetStream`,
+      );
+    }
+
+    // 5. Response
+    res.json({
+      message: "Users verified successfully",
+      matched: updateResult.matchedCount,
+      modified: updateResult.modifiedCount,
+      upsertedInStream: usersToUpsert.length,
+    });
+  } catch (error) {
+    console.error("Error during bulk verify:", error);
+    res.status(500).json({
+      error: "Failed to verify users",
+      details: error.message,
+    });
+  }
+});
+
 router.patch("/sync", [auth, admin], async (_req, res) => {
   try {
     const sparklers = (await Sparkler.find({})).map(
