@@ -1,8 +1,9 @@
-import { StreamClient } from "@stream-io/node-sdk";
 import bcrypt from "bcrypt";
 import express from "express";
 
 import { User } from "../models/user.js";
+
+const router = express.Router();
 
 router.post("/", async (req, res) => {
   try {
