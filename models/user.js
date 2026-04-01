@@ -10,7 +10,10 @@ const schema = new mongoose.Schema({
   },
   password: String,
   name: String,
-  role: String,
+  role: {
+    type: String,
+    default: "client",
+  },
 });
 
 schema.methods.generateAuthToken = function () {
@@ -21,7 +24,7 @@ schema.methods.generateAuthToken = function () {
       email: this.email,
       role: this.role,
     },
-    process.env.jwtPrivateKey || "9312",
+    process.env.jwtPrivateKey,
   );
 };
 

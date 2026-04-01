@@ -9,11 +9,24 @@ router.post("/", async (req, res) => {
   try {
     const { email, role, password, name } = req.body;
 
-    if (!email || !role || !password || !name)
+    if (!email || !password)
       return res.status(400).send({ error: "Invalid info" });
 
     let user = await User.find({ email });
-    if (user) return res.status(400).send({ error: "User already exists" });
+    if (user) {
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword)
+        return res
+          .status(400)
+          .send({ error: "Invalid email and/or password." });
+
+      const token = user.generateAuthToken();
+      res.header("x-auth-token", token).send(token);
+      return res.status(200).send({ error: "User already exists" });
+    }
+
+    if (!name)
+      return res.status(400).send({ error: "Role and name are required!" });
 
     user = new User({ email, role, name });
     const salt = await bcrypt.genSalt(10);
