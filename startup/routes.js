@@ -17,9 +17,6 @@ import pushTokens from "../routes/pushTokens.js";
 import reports from "../routes/reports.js";
 import sparklers from "../routes/sparklers.js";
 import verifications from "../routes/verifications.js";
-import users from "../routes/users.js";
-import goods from "../routes/goods.js";
-import deliveries from "../routes/deliveries.js";
 
 export default function (app) {
   app.use(express.json());
@@ -39,8 +36,5 @@ export default function (app) {
   app.use("/api/reports", reports);
   app.use("/api/sparklers", sparklers);
   app.use("/api/verifications", verifications);
-  app.use("/api/users", users);
-  app.use("/api/goods", goods);
-  app.use("/api/deliveries", deliveries);
   app.use(error);
 }
