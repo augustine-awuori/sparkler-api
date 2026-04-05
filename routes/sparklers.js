@@ -84,9 +84,17 @@ router.post("/auth-google", async (req, res) => {
       await client.upsertUsers([
         { id: sparkler._id.toString(), image, name, custom: { username } },
       ]);
-      sparkler = new Sparkler({ email, name, image });
       const feedToken = createUserToken(sparkler._id.toString());
+      sparkler = new Sparkler({ email, name, image });
       sparkler.custom = { username, feedToken };
+      await sparkler.save();
+    }
+
+    if (!sparkler?.custom?.feedToken) {
+      sparkler.custom = {
+        ...(sparkler.custom || {}),
+        feedToken: createUserToken(sparkler._id.toString()),
+      };
       await sparkler.save();
     }
 
