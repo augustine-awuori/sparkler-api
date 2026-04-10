@@ -9,8 +9,9 @@ import admin from "../middlewares/admin.js";
 import auth from "../middlewares/auth.js";
 
 const client = new StreamClient(
-  process.env.NEW_FEED_API_KEY,
-  process.env.NEW_CHAT_API_SECRET,
+  process.env.NEW_FEED_API_KEY || "p4j79enx348e",
+  process.env.NEW_CHAT_API_SECRET ||
+    "wxsx8zxcaqbgpdp2r7rsve45edpsf3w7dujrs9grjuu68vs92hxvq9h6jwu6c5av",
 );
 
 const router = express.Router();
@@ -84,19 +85,11 @@ router.post("/auth-google", async (req, res) => {
       await client.upsertUsers([
         { id: sparkler._id.toString(), image, name, custom: { username } },
       ]);
-      const feedToken = createUserToken(sparkler._id.toString());
-      sparkler = new Sparkler({ email, name, image });
-      sparkler.custom = { username, feedToken };
-      await sparkler.save();
+      sparkler = new Sparkler({ email, name, image, custom: { username } });
     }
-
-    if (!sparkler?.custom?.feedToken) {
-      sparkler.custom = {
-        ...(sparkler.custom || {}),
-        feedToken: createUserToken(sparkler._id.toString()),
-      };
-      await sparkler.save();
-    }
+    const feedToken = createUserToken(sparkler._id.toString());
+    sparkler.custom = { ...(sparkler.custom || {}), feedToken };
+    await sparkler.save();
 
     const token = sparkler.generateAuthToken();
     res.header("x-auth-token", token).send(token);
