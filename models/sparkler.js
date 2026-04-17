@@ -21,6 +21,12 @@ const schema = new mongoose.Schema({
   name: String,
   image: String,
   authCode: String,
+  timestamp: {
+    type: Number,
+    default: function () {
+      return this._id.getTimestamp();
+    },
+  },
 });
 
 schema.methods.generateAuthToken = function () {
@@ -31,7 +37,7 @@ schema.methods.generateAuthToken = function () {
       image: this.image,
       custom: this.custom,
     },
-    process.env.jwtPrivateKey
+    process.env.jwtPrivateKey,
   );
 };
 
