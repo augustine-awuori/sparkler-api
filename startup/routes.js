@@ -16,6 +16,7 @@ import mails from "../routes/mails.js";
 import pushTokens from "../routes/pushTokens.js";
 import reports from "../routes/reports.js";
 import sparklers from "../routes/sparklers.js";
+import schools from "../routes/schools.js";
 import verifications from "../routes/verifications.js";
 
 export default function (app) {
@@ -35,6 +36,7 @@ export default function (app) {
   app.use("/api/pushTokens", pushTokens);
   app.use("/api/reports", reports);
   app.use("/api/sparklers", sparklers);
+  app.use("/api/schools", schools);
   app.use("/api/verifications", verifications);
   app.use(error);
 }
