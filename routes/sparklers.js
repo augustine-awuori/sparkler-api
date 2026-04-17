@@ -231,7 +231,8 @@ router.get("/guest", async (req, res) => {
 router.patch("/", auth, async (req, res) => {
   try {
     const user = await Sparkler.findByIdAndUpdate(req.user.id, req.body, {
-      new: true,
+      returnDocument: "after",
+      runValidators: true,
     });
 
     if (!user)
@@ -239,19 +240,26 @@ router.patch("/", auth, async (req, res) => {
         .status(404)
         .send({ error: "User does not exist in the database" });
 
-    const { name, custom, image } = user;
-    const response = await client.upsertUsers([
-      { id: user._id.toString(), custom: { ...custom }, name, image },
-    ]);
+    try {
+      const { name, custom, image } = user;
+      await client.upsertUsers([
+        { id: user._id.toString(), custom: { ...custom }, name, image },
+      ]);
+      return res.send(user.generateAuthToken());
+    } catch (error) {
+      console.error("Stream upsert error:", error);
 
-    response
-      ? res.send(user.generateAuthToken())
-      : res
-          .status(500)
-          .send({ error: `Error updating user info: ${streamUser}` });
+      // Still return the updated user even if Stream fails (fail gracefully)
+      return res.status(200).send({
+        ...user.toObject(),
+        warning: "User updated in database but failed to sync with Stream Chat",
+      });
+    }
   } catch (error) {
-    console.error(`Error updating user ${error}`);
-    res.status(500).send({ error });
+    console.error("Error updating user:", error);
+    res.status(500).send({
+      error: error.message || "Internal server error",
+    });
   }
 });
 
