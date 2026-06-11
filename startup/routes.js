@@ -13,6 +13,7 @@ import feedback from "../routes/feedback.js";
 import grao from "../routes/grao.js";
 import issues from "../routes/issues.js";
 import mails from "../routes/mails.js";
+import metrics from "../routes/metrics.js";
 import pushTokens from "../routes/pushTokens.js";
 import reports from "../routes/reports.js";
 import sparklers from "../routes/sparklers.js";
@@ -33,6 +34,7 @@ export default function (app) {
   app.use("/api/grao", grao);
   app.use("/api/issues", issues);
   app.use("/api/mails", mails);
+  app.use("/api/metrics", metrics);
   app.use("/api/pushTokens", pushTokens);
   app.use("/api/reports", reports);
   app.use("/api/sparklers", sparklers);
