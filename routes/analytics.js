@@ -3,6 +3,7 @@ import express from "express";
 import { UserPresence } from "../models/UserPresence.js";
 import { DailySession } from "../models/DailySession.js";
 import auth from "../middlewares/auth.js";
+import Engagement from "../models/Engagement.js";
 
 const router = express.Router();
 
