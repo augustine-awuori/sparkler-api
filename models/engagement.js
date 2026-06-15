@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const engagementSchema = new mongoose.Schema(
+const schema = new mongoose.Schema(
   {
     userId: { type: String, required: true, index: true, ref: "User" },
     action: {
@@ -26,8 +26,7 @@ const engagementSchema = new mongoose.Schema(
 );
 
 // Indexes for fast analytics
-engagementSchema.index({ userId: 1, date: 1 });
-engagementSchema.index({ action: 1, date: 1 });
+schema.index({ userId: 1, date: 1 });
+schema.index({ action: 1, date: 1 });
 
-const Engagement = mongoose.model("Engagement", engagementSchema);
-export default Engagement;
+export const Engagement = mongoose.model("Engagement", schema);
