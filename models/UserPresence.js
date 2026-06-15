@@ -29,9 +29,7 @@ const schema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
 export const UserPresence = mongoose.model("UserPresence", schema);

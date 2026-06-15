@@ -1,7 +1,7 @@
 import express from "express";
 
-import { UserPresence } from "../models/userPresence.js";
-import { DailySession } from "../models/dailySession.js";
+import { UserPresence } from "../models/UserPresence.js";
+import { DailySession } from "../models/DailySession.js";
 import auth from "../middlewares/auth.js";
 
 const router = express.Router();
