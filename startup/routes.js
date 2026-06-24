@@ -3,7 +3,6 @@ import express from "express";
 import serveStatic from "serve-static";
 
 import alumnis from "../routes/alumnis.js";
-import analytics from "../routes/analytics.js";
 import bugs from "../routes/bugs.js";
 import chatToken from "../routes/chatToken.js";
 import communities from "../routes/communities.js";
@@ -25,7 +24,6 @@ export default function (app) {
   app.use(serveStatic("public", { acceptRanges: false }));
   app.use(cors({ origin: "*" }));
   app.use("/api/alumnis", alumnis);
-  app.use("/api/analytics", analytics);
   app.use("/api/bugs", bugs);
   app.use("/api/chatToken", chatToken);
   app.use("/api/communities", communities);
