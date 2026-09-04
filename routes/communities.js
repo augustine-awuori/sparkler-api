@@ -5,12 +5,13 @@ import { StreamClient } from "@stream-io/node-sdk";
 import { Community, validateCommunity } from "../models/community.js";
 import { Sparkler } from "../models/sparkler.js";
 import auth from "../middlewares/auth.js";
+import requireEnv from "../utils/requireEnv.js";
 import sendPushNotification from "../utils/pushNotifications.js";
 import validate from "../middlewares/validate.js";
 
 const client = new StreamClient(
-  process.env.NEW_FEED_API_KEY,
-  process.env.NEW_CHAT_API_SECRET,
+  requireEnv("NEW_FEED_API_KEY"),
+  requireEnv("NEW_CHAT_API_SECRET"),
 );
 
 const router = express.Router();

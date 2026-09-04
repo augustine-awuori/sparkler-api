@@ -2,19 +2,37 @@ import { StreamClient } from "@stream-io/node-sdk";
 import bcrypt from "bcrypt";
 import express from "express";
 
-import { findUniqueUsername } from "../services/users.js";
+import {
+  findUniqueUsername,
+  toPublicUser,
+  toStreamUser,
+} from "../services/users.js";
 import { sendMail } from "../services/mail.js";
 import { Sparkler } from "../models/sparkler.js";
 import admin from "../middlewares/admin.js";
 import auth from "../middlewares/auth.js";
+import requireEnv from "../utils/requireEnv.js";
 
 const client = new StreamClient(
-  process.env.NEW_FEED_API_KEY || "p4j79enx348e",
-  process.env.NEW_CHAT_API_SECRET ||
-    "wxsx8zxcaqbgpdp2r7rsve45edpsf3w7dujrs9grjuu68vs92hxvq9h6jwu6c5av",
+  requireEnv("NEW_FEED_API_KEY"),
+  requireEnv("NEW_CHAT_API_SECRET"),
 );
 
+const FEED_TOKEN_DAYS = 1;
+
 const router = express.Router();
+
+// Mongo is the source of truth; a Stream outage must never fail a sign-in.
+// PATCH /sync reconciles anything that drifts while Stream is unavailable.
+async function syncToStream(doc) {
+  try {
+    await client.upsertUsers([toStreamUser(doc)]);
+    return true;
+  } catch (error) {
+    console.error(`Stream upsert failed for ${doc._id}: ${error}`);
+    return false;
+  }
+}
 
 router.post("/auth-code/verify", async (req, res) => {
   try {
@@ -36,33 +54,22 @@ router.post("/auth-code/verify", async (req, res) => {
         .status(400)
         .send({ error: "Invalid username and/or authentication code." });
 
-    const { name, id, image } = sparkler;
-    const feedToken = createUserToken(id.toString());
+    const { name, custom = {} } = sparkler;
 
-    if (sparkler.custom.invalid) {
-      await client.upsertUsers([
-        {
-          id,
-          name,
-          image,
-          custom: {
-            ...sparkler.custom,
-            invalid: false,
-            username: username
-              ? await findUniqueUsername(username)
-              : sparkler.custom.username,
-            feedToken,
-          },
-        },
-      ]);
+    if (custom.invalid) {
       if (username)
-        sparkler.custom.username = await findUniqueUsername(username || name);
+        sparkler.custom = {
+          ...custom,
+          username: await findUniqueUsername(username),
+        };
       if (newUserName) sparkler.name = newUserName || name;
     }
 
-    sparkler.custom = { ...sparkler.custom, feedToken, invalid: false };
+    sparkler.custom = { ...sparkler.custom, invalid: false };
     sparkler.authCode = "";
     await sparkler.save();
+
+    await syncToStream(sparkler);
 
     const token = sparkler.generateAuthToken();
     res.header("x-auth-token", token).send(token);
@@ -82,43 +89,41 @@ router.post("/auth-google", async (req, res) => {
     let sparkler = await Sparkler.findOne({ email });
     if (!sparkler) {
       const username = await findUniqueUsername(name);
-      await client.upsertUsers([
-        { id: sparkler._id.toString(), image, name, custom: { username } },
-      ]);
       sparkler = new Sparkler({ email, name, image, custom: { username } });
+      await sparkler.save();
     }
-    const feedToken = createUserToken(sparkler._id.toString());
-    sparkler.custom = { ...(sparkler.custom || {}), feedToken };
-    await sparkler.save();
+
+    await syncToStream(sparkler);
 
     const token = sparkler.generateAuthToken();
     res.header("x-auth-token", token).send(token);
   } catch (error) {
-    console.error(`Error loggin user with google: ${error}`);
-    res.status(500).send({ error: "Error loggin with google " + error });
+    console.error(`Error logging user in with google: ${error}`);
+    res.status(500).send({ error: "Error logging in with google " + error });
   }
 });
 
 router.post("/quick", async (req, res) => {
   try {
-    const { email, image, name } = req.body;
+    const { email, image = "", name } = req.body;
+
+    if (!email || !name)
+      return res.status(400).send({ error: "Name and email are required" });
+
     let sparkler = await Sparkler.findOne({ email });
     if (!sparkler) {
       const username = await findUniqueUsername(name);
-      await client.upsertUsers([
-        { id: sparkler._id.toString(), image, name, custom: { username } },
-      ]);
-      sparkler = new Sparkler({ email, name, image });
-      const feedToken = createUserToken(sparkler._id.toString());
-      sparkler.custom = { username, feedToken };
+      sparkler = new Sparkler({ email, name, image, custom: { username } });
       await sparkler.save();
     }
+
+    await syncToStream(sparkler);
 
     const token = sparkler.generateAuthToken();
     res.header("x-auth-token", token).send(token);
   } catch (error) {
-    console.error(`Error loggin user with google: ${error}`);
-    res.status(500).send({ error: "Error loggin with google " + error });
+    console.error(`Error with quick sign-in: ${error}`);
+    res.status(500).send({ error: "Error with quick sign-in " + error });
   }
 });
 
@@ -177,33 +182,39 @@ router.post("/", async (req, res) => {
         .status(400)
         .send({ error: "Invalid username and/or auth code." });
 
-    const feedToken = createUserToken(sparkler.id);
     sparkler.name = name;
     sparkler.custom = {
+      ...sparkler.custom,
       email,
       username: await findUniqueUsername(name),
       invalid: false,
-      feedToken,
     };
     await sparkler.save();
 
-    await client.upsertUsers([
-      {
-        id: sparkler.id.toString(),
-        name,
-        custom: { ...sparkler.custom },
-      },
-    ]);
+    await syncToStream(sparkler);
 
     const token = sparkler.generateAuthToken();
     res.header("x-auth-token", token).send(token);
   } catch (error) {
-    console.error(error);
+    console.error(`Error signing user in with auth code: ${error}`);
+    res.status(500).send({ error: "Error signing in " + error });
   }
 });
 
-router.get("/", async (_req, res) => {
-  res.send(await Sparkler.find({}));
+// Mints a short-lived Stream feed token for the caller only. This replaces
+// reading `feedToken` off the Stream user object, which exposed every user's
+// token to every other signed-in user.
+router.get("/feed-token", auth, (req, res) => {
+  res.send({
+    feedToken: createUserToken(req.user.id),
+    expiresInSeconds: FEED_TOKEN_DAYS * 24 * 60 * 60,
+  });
+});
+
+router.get("/", auth, async (_req, res) => {
+  const sparklers = await Sparkler.find({}).lean();
+
+  res.send(sparklers.map(toPublicUser));
 });
 
 router.get("/guest", async (req, res) => {
@@ -240,21 +251,16 @@ router.patch("/", auth, async (req, res) => {
         .status(404)
         .send({ error: "User does not exist in the database" });
 
-    try {
-      const { name, custom, image } = user;
-      await client.upsertUsers([
-        { id: user._id.toString(), custom: { ...custom }, name, image },
-      ]);
-      return res.send(user.generateAuthToken());
-    } catch (error) {
-      console.error("Stream upsert error:", error);
+    const synced = await syncToStream(user);
 
-      // Still return the updated user even if Stream fails (fail gracefully)
-      return res.status(200).send({
-        ...user.toObject(),
-        warning: "User updated in database but failed to sync with Stream Chat",
-      });
-    }
+    // Still return the updated user even if Stream fails (fail gracefully)
+    return synced
+      ? res.send(user.generateAuthToken())
+      : res.status(200).send({
+          ...toPublicUser(user),
+          warning:
+            "User updated in database but failed to sync with Stream Chat",
+        });
   } catch (error) {
     console.error("Error updating user:", error);
     res.status(500).send({
@@ -298,18 +304,7 @@ router.patch("/verify", [auth, admin], async (req, res) => {
     ).lean(); // lean() → plain JS objects, faster
 
     // 3. Prepare GetStream user objects
-    const usersToUpsert = updatedUsers.map((doc) => ({
-      id: doc._id.toString(), // or doc.id if you already have it
-      name: doc.name || "",
-      image: doc.image || "",
-      custom: {
-        email: doc.email,
-        verified: doc.custom?.verified ?? true, // now true
-        isAdmin: doc.custom?.isAdmin ?? false,
-        username: doc.custom?.username || "",
-        invalid: doc.custom?.invalid ?? false,
-      },
-    }));
+    const usersToUpsert = updatedUsers.map(toStreamUser);
 
     // 4. Bulk upsert to GetStream
     if (usersToUpsert.length > 0) {
@@ -337,19 +332,7 @@ router.patch("/verify", [auth, admin], async (req, res) => {
 
 router.patch("/sync", [auth, admin], async (_req, res) => {
   try {
-    const sparklers = (await Sparkler.find({})).map(
-      ({
-        id,
-        name,
-        image,
-        custom: { email, verified, isAdmin, username, invalid },
-      }) => ({
-        id,
-        name,
-        image,
-        custom: { email, verified, isAdmin, username, invalid },
-      }),
-    );
+    const sparklers = (await Sparkler.find({}).lean()).map(toStreamUser);
 
     if (sparklers.length === 0) {
       return res.status(200).json({ message: "No users to sync", updated: 0 });
@@ -396,7 +379,7 @@ router.patch("/sync", [auth, admin], async (_req, res) => {
 
 export default router;
 
-function createUserToken(userId, days = 365) {
+function createUserToken(userId, days = FEED_TOKEN_DAYS) {
   return client.generateUserToken({
     user_id: userId.toString(),
     validity_in_seconds: days * 24 * 60 * 60,

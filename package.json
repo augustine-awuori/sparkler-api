@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node index.js",
+    "test:signup": "node tests/signup.mjs"
   },
   "keywords": [],
   "author": "",
@@ -37,6 +38,7 @@
     "winston-mongodb": "^5.1.1"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2"
+    "@types/bcrypt": "^5.0.2",
+    "mongodb-memory-server": "^11.2.0"
   }
 }

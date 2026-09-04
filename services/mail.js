@@ -1,7 +1,9 @@
 import Mailgen from "mailgen";
 import { Resend } from "resend";
 
-const resend = new Resend("re_jZfGM1iA_JTGoVE2uq2oLzkPZ61wzwsfX");
+import requireEnv from "../utils/requireEnv.js";
+
+const resend = new Resend(requireEnv("RESEND_API_KEY"));
 
 function generateHTMLEmail({ message }) {
   const mailGenerator = new Mailgen({
