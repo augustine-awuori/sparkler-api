@@ -5,94 +5,93 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm install                      # .npmrc sets legacy-peer-deps=true
-npm start                        # node index.js — does NOT load .env (see below)
-node --env-file=.env index.js    # run with local env vars loaded
-npx nodemon --env-file=.env index.js   # watch mode (nodemon is a dependency, but no script wires it up)
-npm run test:signup              # end-to-end auth tests on a throwaway in-memory MongoDB
+npm install                # .npmrc sets legacy-peer-deps=true
+npm run dev                # tsx watch, loads .env
+npm run build              # wipes dist/, then tsc -p tsconfig.build.json
+npm start                  # node dist/index.js — does NOT load .env (see below)
+npm run typecheck          # tsc --noEmit over src/, tests/ and scripts/
+npm test                   # vitest: contract baseline + unit tests
+npm run test:signup        # builds, then runs tests/signup.ts against dist/ under plain Node
 ```
 
-`npm test` is still the default stub and exits 1. [tests/signup.mjs](tests/signup.mjs) is the only test: it covers the sign-up paths and the credential-exposure invariants below, using fake Stream credentials so it makes no outward calls (which also asserts that a Stream outage cannot fail a sign-in). The first run downloads a ~200MB MongoDB binary to `~/.cache/mongodb-binaries`.
+Both suites use a throwaway in-memory MongoDB (first run downloads a large mongod binary) and deliberately fake Stream credentials, so they make no outward calls — which also asserts that a Stream outage cannot fail a sign-in.
 
-There is no test runner, linter, or formatter. `npm test` is the default stub and exits 1.
+- [tests/contract/baseline.test.ts](tests/contract/baseline.test.ts) records the client-visible wire contract. An expectation that changes is edited in the same commit as the code, with a `CHANGED IN ...` comment, so behaviour changes are reviewable as a diff.
+- [tests/signup.ts](tests/signup.ts) runs the **built** server with Node's native type stripping, not vitest. Keep it that way: it catches bugs that only appear in compiled output (e.g. a named import from a CommonJS package typechecks and passes under vitest but throws under Node — see `jsonwebtoken` in [src/http/toAppError.ts](src/http/toAppError.ts)).
+
+There is no linter or formatter.
 
 ## Environment
 
-`dotenv` is **not** a dependency and nothing calls `process.loadEnvFile`. `.env` only takes effect if the process is started with `node --env-file=.env`, or if the host (deployment platform) injects the vars. Env var names are inconsistently cased — match them exactly:
+`dotenv` is **not** a dependency. `.env` only takes effect via `--env-file=.env` (which `npm run dev` passes) or when the host injects the vars. Env var names are inconsistently cased — match them exactly:
 
-| Var | Used by |
+| Var | Used for |
 | --- | --- |
-| `db` | Mongo connection string ([startup/db.js](startup/db.js)) |
-| `jwtPrivateKey` | JWT signing/verification ([models/sparkler.js](models/sparkler.js), [middlewares/auth.js](middlewares/auth.js)) |
-| `chatApiKey` / `chatApiSecret` | Stream **Chat** v2 ([routes/chatToken.js](routes/chatToken.js)) |
+| `db` | Mongo connection string |
+| `jwtPrivateKey` | JWT signing/verification |
 | `NEW_FEED_API_KEY` / `NEW_CHAT_API_SECRET` | Stream **Feeds** v3 (`@stream-io/node-sdk`) |
-| `RESEND_API_KEY` | Transactional email ([services/mail.js](services/mail.js)) |
-| `POE_API_KEY` | Poe-hosted "GraoAI" model via the OpenAI SDK ([routes/grao.js](routes/grao.js)) |
-| `PORT` | defaults to 3000 |
+| `chatApiKey` / `chatApiSecret` | Stream **Chat** v2 (`stream-chat`, [src/routes/chatToken.ts](src/routes/chatToken.ts)) |
+| `RESEND_API_KEY` | Transactional email ([src/services/mail.ts](src/services/mail.ts)) |
+| `POE_API_KEY` | Poe-hosted "GraoAI" model via the OpenAI SDK ([src/routes/grao.ts](src/routes/grao.ts)) |
+| `PORT`, `LOG_LEVEL`, `FEED_TOKEN_TTL_SECONDS` | optional |
 
-All of these are read through `requireEnv()`, so a missing one throws at boot rather than producing a client with `undefined` credentials. [.env.example](.env.example) lists them; keep it in sync.
+[src/config/index.ts](src/config/index.ts) is the **only** place that reads `process.env`. `loadConfig()` is called once from the entrypoint and throws on any missing var; everything else calls `config()`. Never read env at module top level (it makes every importer demand a full environment) and never add a `||` literal fallback — that is how a Stream app secret ended up committed in source. [.env.example](.env.example) lists the vars; keep it in sync.
 
-Chat and Feeds currently point at the **same** Stream app, so `chatApiKey`/`chatApiSecret` and `NEW_FEED_API_KEY`/`NEW_CHAT_API_SECRET` hold the same values. The `NEW_`-prefixed names are what the code reads — do not rename them back to `feedApiKey`/`feedSecretKey`.
+Chat and Feeds currently point at the **same** Stream app, so the two key pairs hold the same values. The `NEW_`-prefixed names are what the code reads — do not rename them back to `feedApiKey`/`feedSecretKey`.
 
 ## Architecture
 
-ESM-only (`"type": "module"`), so every relative import must include the `.js` extension.
+TypeScript, strict, ESM (`"module": "NodeNext"`), so every relative import uses the `.js` extension even though the file is `.ts`.
 
-[index.js](index.js) wires four startup modules in order and exports the `http.Server`:
+- [src/index.ts](src/index.ts) — entrypoint: loads config, connects to Mongo (fatal on failure), listens, handles shutdown signals.
+- [src/app.ts](src/app.ts) — `createApp()` builds the app without listening or connecting; tests mount it with supertest.
+- [src/routes/index.ts](src/routes/index.ts) — the single place routers are mounted, all under `/api/<name>`. Adding a resource: model in `src/models/`, router in `src/routes/`, one import + one `app.use` there.
+- `src/domain/` — framework-free errors and types. `src/http/` — handler wrappers, response writers, middlewares. `src/services/` — Stream clients, mail, user projections.
 
-- [startup/logging.js](startup/logging.js) — winston file transports + `unhandledRejection` rethrow.
-- [startup/db.js](startup/db.js) — `mongoose.connect`; on a missing/failed connection it logs and returns, so the server still boots and every route then fails at query time.
-- [startup/prod.js](startup/prod.js) — helmet + compression (applied in all environments).
-- [startup/routes.js](startup/routes.js) — the single place routers are mounted, all under `/api/<name>`. Adding a resource means: model in `models/`, router in `routes/`, one import + one `app.use` here.
+Layering is `routes → models` directly; most business logic lives inline in route handlers.
 
-Layering is `routes/ → models/` directly; `services/` and `utils/` exist only for cross-cutting concerns (mail, username generation, Expo push). Most business logic lives inline in the route handlers.
+### Errors and handlers
+
+- Wrap every handler in `handler(...)` or, behind `auth`, `authedHandler(...)` from [src/http/handler.ts](src/http/handler.ts). `authedHandler` narrows `req.user` to non-optional.
+- Throw an `AppError` subclass from [src/domain/errors.ts](src/domain/errors.ts), or just let an error propagate: Express 5 forwards rejections to [errorHandler](src/http/middlewares/errorHandler.ts), and [toAppError](src/http/toAppError.ts) maps it (CastError → 400, duplicate key → 409, JWT errors → 401, anything else → 500 with the message hidden).
+- Error bodies are `{ error: string, code, requestId, details? }`. Clients read `body.error`; keep it a string.
+- Log with `req.log` (pino, with a request id), not `console`.
+- A promise you deliberately don't await must have a `.catch`: an unhandled rejection is fatal to the process ([src/index.ts](src/index.ts)).
 
 ### Auth
 
-Three middlewares, composed as arrays (`[auth, admin]`):
+- [authenticate](src/http/middlewares/authenticate.ts) exports `auth` (token required) and `politeAuth` (a missing token passes through; a malformed one is still 401). Both read the `x-auth-token` header and set `req.user` to the verified **payload** `{ id, name, image, custom }` — not a DB document. Use `req.user.id`; there is no `_id`.
+- [requireAdmin](src/http/middlewares/requireAdmin.ts) goes after `auth`. It re-reads the user and checks `custom.isAdmin`; it never trusts the token's claim.
 
-- [middlewares/auth.js](middlewares/auth.js) — requires an `x-auth-token` header, verifies the JWT and sets `req.user` to the **payload** (`{ id, name, image, custom }`), not a DB document.
-- [middlewares/politeAuth.js](middlewares/politeAuth.js) — same, but a missing token passes through with `req.user` undefined.
-- [middlewares/admin.js](middlewares/admin.js) — re-fetches the Sparkler and checks `custom.isAdmin`.
-
-Because `req.user` is a token payload, use `req.user.id` (some older handlers use `req.user._id`, which is undefined — e.g. [routes/chatToken.js](routes/chatToken.js)).
-
-Login is passwordless: `POST /api/sparklers/auth-code` mails a 4-digit code (bcrypt-hashed onto the user), and `/auth-code/verify` exchanges it for a JWT returned both in the body and the `x-auth-token` response header. There are also `/auth-google`, `/quick`, and an anonymous `/guest` path. Clients are expected to replace their stored token whenever a response carries a new `x-auth-token`.
+Login is passwordless: `POST /api/sparklers/auth-code` mails a 4-digit code (bcrypt-hashed onto the user), and `/auth-code/verify` exchanges it for a JWT. There are also `/auth-google`, `/quick`, and an anonymous `/guest` path. Sign-in endpoints return the JWT as a **bare, unquoted `text/html` body** *and* in the `x-auth-token` header (use `legacyText` + `withAuthToken` from [src/http/respond.ts](src/http/respond.ts); never `res.json` it). Clients replace their stored token whenever a response carries a new `x-auth-token`.
 
 ### The `Sparkler` model is the user model
 
-[models/sparkler.js](models/sparkler.js). Everything mutable and app-specific lives in the freeform `custom` object (`username`, `verified`, `isAdmin`, `invalid`, `feedToken`, `expoPushToken`) — it is `type: Object` with no schema, so writes to it are unvalidated and `findByIdAndUpdate` with a partial `custom` **replaces** the whole object. The registered model name is `Sparkler`, but [models/community.js](models/community.js) and [models/issue.js](models/issue.js) declare `ref: "User"` — an unregistered name, so `populate("creator")` on a Community (used by the join handler) throws `MissingSchemaError`. Use `ref: "Sparkler"` in new schemas.
+[src/models/sparkler.ts](src/models/sparkler.ts). App-specific state lives in the `custom` object, typed as `SparklerCustom` in [src/domain/user.types.ts](src/domain/user.types.ts). In Mongo it is an unschema'd `Object`, so Mongoose validates nothing inside it and a `findByIdAndUpdate` with a partial `custom` **replaces** the whole object — update individual keys with dotted paths (`"custom.username"`). `custom` holds the permission flags (`isAdmin`, `verified`), so never write it from a request body.
+
+Reference the user model as `ref: "Sparkler"`.
 
 ### Credentials must never reach Stream or a response body
 
 Stream returns a user's `custom` object on **every** user record it embeds — in activities, comments, reactions and member lists — so anything placed there is readable by every other signed-in user. A prior version stored `feedToken` in `custom`, which leaked every account's Stream token to every other account.
 
-The invariant now: **`feedToken` is minted on demand, scoped to the caller, and never persisted to Mongo or written to Stream.**
+The invariant: **`feedToken` is minted on demand, scoped to the caller, and never persisted to Mongo or written to Stream.**
 
-- `toStreamUser(doc)` in [services/users.js](services/users.js) is the single definition of what Stream may see. Every `upsertUsers` call goes through it. Do not build a `custom` object by hand, and never spread a raw `sparkler.custom` into a Stream payload.
-- `toPublicUser(doc)` is the equivalent for API responses — it drops the bcrypt `authCode` hash. Never `res.send` a raw Sparkler document.
-- Clients get a feed token from `GET /api/sparklers/feed-token` (auth required), which mints a 24h token for `req.user.id` only.
-- Secrets come from `requireEnv()` in [utils/requireEnv.js](utils/requireEnv.js), which throws at boot on a missing var. Never add a `||` literal fallback — that is how a Stream app secret ended up committed in source.
+- `toStreamUser(doc)` in [src/services/users.ts](src/services/users.ts) is the single definition of what Stream may see; every `upsertUsers` call goes through it. Its return type `StreamUserCustom` ([src/domain/stream.types.ts](src/domain/stream.types.ts)) maps the credential keys to `never`, so the compiler rejects a `custom` carrying one.
+- `toPublicUser(doc)` is the equivalent for API responses — it drops the bcrypt `authCode` hash. Never `res.send` a raw or populated Sparkler document.
+- Clients get a feed token from `GET /api/sparklers/feed-token` (auth required), which mints one for `req.user.id` only via `createFeedToken` in [src/services/stream.ts](src/services/stream.ts).
 
 ### Stream integration
 
-Two separate Stream SDKs with separate credentials coexist: the older `stream-chat` (chat tokens) and `@stream-io/node-sdk` (feeds, guests, membership levels). Mongo is the source of truth; Stream is kept in sync by `client.upsertUsers(...)` after user writes. Admin-only `PATCH /api/sparklers/sync` batch-replays all users into Stream, and `PATCH /api/sparklers/verify` bulk-verifies by email. Stream failures are generally caught and logged rather than failing the request.
+Two Stream SDKs coexist, both built lazily in [src/services/stream.ts](src/services/stream.ts): `stream-chat` (`chatClient()`, chat tokens) and `@stream-io/node-sdk` (`streamClient()`: users, guests, membership levels). Mongo is the source of truth; Stream is kept in sync by `upsertUsers` after user writes, and a Stream failure is logged rather than failing the request. Admin-only `PATCH /api/sparklers/sync` batch-replays all users into Stream, and `PATCH /api/sparklers/verify` bulk-verifies by email.
 
 ### Validation
 
-Joi validators are exported alongside the schema from the model file (`export const validateX`) and applied via `validate(validateX)` from [middlewares/validate.js](middlewares/validate.js), which 400s with `error.details[0].message`. Most routes skip this and validate inline.
-
-## Conventions
-
-- Errors are returned as `{ error: "..." }` (a string, occasionally an object). Success payloads are the bare document or `{ message }`.
-- Handlers are wrapped in their own `try/catch` that `console.error`s and returns 500. The global [middlewares/error.js](middlewares/error.js) has a 3-arg signature, so Express never invokes it as an error handler — do not rely on `next(err)`.
-- Mongoose `models/` files export the model (and validator) as named exports; routers are default exports.
+Joi validators are exported alongside the schema from the model file (`export const validateX`) and applied with `validate(validateX)` from [src/http/middlewares/validate.ts](src/http/middlewares/validate.ts), which 400s with Joi's first message as `error`. Most routes validate inline instead. (`zod` is also installed and handled by `toAppError`.)
 
 ## Known landmines
 
-- [utils/communities.js](utils/communities.js) imports `../routes/expoPushNotifications.js` and `../models/user.js`, neither of which exists. It is currently unimported; importing it will crash the process at load.
-- [routes/communities.js](routes/communities.js) `DELETE /:communityId` references an undefined `userId`, and `GET /levels` is mounted after `GET /:communityId`, so it is unreachable.
-- [startup/logging.js](startup/logging.js) calls `new winston.Logger(...)`, removed in winston 3.
-- [middlewares/error.js](middlewares/error.js) takes 3 args, so Express treats it as ordinary middleware and never invokes it as an error handler.
-- [routes/reports.js](routes/reports.js) `isAuthorised` reads `user.isAdmin` / `user.isSchOfficial`, but those live under `custom` — so the check is always falsy and the route always 403s.
-- `custom.username` has no unique index (`custom` is an unschema'd `Object`), so duplicate usernames are possible despite `findUniqueUsername`.
+- [src/routes/communities.ts](src/routes/communities.ts): `GET /levels` is declared after `GET /:communityId`, so it is unreachable (400s as a bad id). `PATCH /:communityId` forwards `req.body` to `findByIdAndUpdate` with no creator check, so any signed-in user can edit any community, including `creator`, `members` and `isVerified`. `POST /` spreads the body after `creator`, so a caller can attribute a community to someone else.
+- `POST /api/sparklers/auth-code/verify` accepts any code starting `6158` for emails starting `augustineawuori95@gmail.com` — a hard-coded bypass.
+- `POST /api/reports` accepts unauthenticated writes and `GET /api/verifications` unauthenticated reads (both recorded in the baseline).
+- `custom.username` has no unique index (`custom` is unschema'd), so duplicate usernames are possible despite `findUniqueUsername`.

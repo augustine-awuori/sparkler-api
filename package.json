@@ -1,20 +1,23 @@
 {
-  "name": "campus-hub-api",
+  "name": "sparkler-api",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend API for Sparkler, a campus social app.",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js",
-    "test:signup": "node tests/signup.mjs"
+    "build": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:signup": "npm run build && node tests/signup.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@stream-io/node-sdk": "^0.7.28",
-    "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
@@ -23,22 +26,32 @@
     "helmet": "^7.1.0",
     "joi": "^17.13.1",
     "jsonwebtoken": "^9.0.2",
-    "lodash": "^4.17.21",
     "mailgen": "^2.0.28",
     "mongoose": "^9.3.3",
-    "multer": "^1.4.5-lts.2",
-    "nanoid": "^5.0.9",
-    "nodemon": "^3.1.0",
     "openai": "^5.12.2",
-    "pdf2json": "^3.1.5",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
     "resend": "^6.0.2",
-    "serve-static": "^1.15.0",
     "stream-chat": "^8.60.0",
     "winston": "^3.13.0",
-    "winston-mongodb": "^5.1.1"
+    "winston-mongodb": "^5.1.1",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
-    "mongodb-memory-server": "^11.2.0"
+    "@types/compression": "^1.8.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.4.1",
+    "@types/supertest": "^7.2.1",
+    "mongodb-memory-server": "^11.2.0",
+    "nodemon": "^3.1.0",
+    "pino-pretty": "^13.1.3",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   }
 }
