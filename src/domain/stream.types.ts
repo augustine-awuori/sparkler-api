@@ -1,4 +1,4 @@
-import type { SparklerCustom } from "./user.types.js";
+import type { SparklerCustom, SparklerProfile } from "./user.types.js";
 
 /**
  * Keys that must NEVER reach Stream.
@@ -42,15 +42,19 @@ export interface StreamUser {
   custom: StreamUserCustom;
 }
 
-/** A Sparkler as returned to an API caller. Reuses the same `custom` whitelist. */
-export interface PublicUser {
+/**
+ * A Sparkler as the unauthenticated directory returns it. No email, and the
+ * same `never` guard as Stream so no credential can be added by accident.
+ */
+export interface DirectoryUser {
   id: string;
   name: string;
   image: string;
-  email: string;
-  /** Absent on documents written before the field existed. */
-  timestamp?: number;
-  custom: StreamUserCustom;
+  /** ISO date. Absent on documents written before `timestamp` existed. */
+  createdAt?: string;
+  custom: { username: string; verified: boolean; isAdmin: boolean } & SparklerProfile & {
+      [K in ForbiddenOnStream]?: never;
+    };
 }
 
 /**

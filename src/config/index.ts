@@ -7,19 +7,11 @@ export interface AppConfig {
   readonly jwtSecret: string;
   readonly logLevel: string;
   readonly stream: {
-    /** Feeds v3 credentials. Chat shares the same Stream app. */
-    readonly apiKey: string;
-    readonly apiSecret: string;
-    /** Lifetime of a minted feed token. */
-    readonly feedTokenTtlSeconds: number;
-  };
-  /** Chat v2 (stream-chat) credentials. Same Stream app as `stream` today. */
-  readonly chat: {
+    /** Feeds v3 credentials. Clients' chat uses the same Stream app. */
     readonly apiKey: string;
     readonly apiSecret: string;
   };
   readonly resendApiKey: string;
-  readonly poeApiKey: string;
 }
 
 let cached: AppConfig | undefined;
@@ -41,14 +33,8 @@ export function loadConfig(): AppConfig {
     stream: {
       apiKey: requireEnv("NEW_FEED_API_KEY"),
       apiSecret: requireEnv("NEW_CHAT_API_SECRET"),
-      feedTokenTtlSeconds: intEnv("FEED_TOKEN_TTL_SECONDS", 24 * 60 * 60),
-    },
-    chat: {
-      apiKey: requireEnv("chatApiKey"),
-      apiSecret: requireEnv("chatApiSecret"),
     },
     resendApiKey: requireEnv("RESEND_API_KEY"),
-    poeApiKey: requireEnv("POE_API_KEY"),
   };
 
   return cached;

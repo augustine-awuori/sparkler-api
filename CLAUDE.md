@@ -29,15 +29,13 @@ There is no linter or formatter.
 | --- | --- |
 | `db` | Mongo connection string |
 | `jwtPrivateKey` | JWT signing/verification |
-| `NEW_FEED_API_KEY` / `NEW_CHAT_API_SECRET` | Stream **Feeds** v3 (`@stream-io/node-sdk`) |
-| `chatApiKey` / `chatApiSecret` | Stream **Chat** v2 (`stream-chat`, [src/routes/chatToken.ts](src/routes/chatToken.ts)) |
-| `RESEND_API_KEY` | Transactional email ([src/services/mail.ts](src/services/mail.ts)) |
-| `POE_API_KEY` | Poe-hosted "GraoAI" model via the OpenAI SDK ([src/routes/grao.ts](src/routes/grao.ts)) |
-| `PORT`, `LOG_LEVEL`, `FEED_TOKEN_TTL_SECONDS` | optional |
+| `NEW_FEED_API_KEY` / `NEW_CHAT_API_SECRET` | Stream (`@stream-io/node-sdk`): user sync and minting feed tokens |
+| `RESEND_API_KEY` | Announcement email ([src/services/mail.ts](src/services/mail.ts)) |
+| `PORT`, `LOG_LEVEL` | optional |
 
 [src/config/index.ts](src/config/index.ts) is the **only** place that reads `process.env`. `loadConfig()` is called once from the entrypoint and throws on any missing var; everything else calls `config()`. Never read env at module top level (it makes every importer demand a full environment) and never add a `||` literal fallback — that is how a Stream app secret ended up committed in source. [.env.example](.env.example) lists the vars; keep it in sync.
 
-Chat and Feeds currently point at the **same** Stream app, so the two key pairs hold the same values. The `NEW_`-prefixed names are what the code reads — do not rename them back to `feedApiKey`/`feedSecretKey`.
+The clients use one Stream app for both Feeds and Chat; this key pair is for that app. The `NEW_`-prefixed names are what the code reads — do not rename them back to `feedApiKey`/`feedSecretKey`.
 
 ## Architecture
 
@@ -49,6 +47,21 @@ TypeScript, strict, ESM (`"module": "NodeNext"`), so every relative import uses 
 - `src/domain/` — framework-free errors and types. `src/http/` — handler wrappers, response writers, middlewares. `src/services/` — Stream clients, mail, user projections.
 
 Layering is `routes → models` directly; most business logic lives inline in route handlers.
+
+### What the clients call
+
+The API serves exactly two clients, `SparklerMobile` (Expo) and `sparkler_web` (TanStack Start), both at `https://campus-hub-api-production.up.railway.app/api`. Everything else was removed; before adding or removing a route, grep both clients' `src/lib/api/`.
+
+| Route | Auth | Used by |
+| --- | --- | --- |
+| `POST /sparklers/quick` | none | both: sign-in after Firebase auth |
+| `GET /sparklers`, `GET /sparklers/:id` | none | directory (both), profile (mobile) |
+| `PATCH /sparklers` / `PATCH /sparklers/:id` | `auth` | edit profile (mobile / web; `:id` must be the caller) |
+| `DELETE /sparklers` | `auth` | delete account (mobile) |
+| `GET /schools` | none | mobile |
+| `POST /pushTokens`, `/send-to-many`, `/send-to-all` | `auth` | Expo push (register: mobile; send: both) |
+| `PATCH /sparklers/verify`, `/sync` | `auth` + `requireAdmin` | ops, by hand |
+| `POST /mails/preview`, `/all`, `/:email` | `auth` + `requireAdmin` | ops, by hand: app announcements |
 
 ### Errors and handlers
 
@@ -63,11 +76,11 @@ Layering is `routes → models` directly; most business logic lives inline in ro
 - [authenticate](src/http/middlewares/authenticate.ts) exports `auth` (token required) and `politeAuth` (a missing token passes through; a malformed one is still 401). Both read the `x-auth-token` header and set `req.user` to the verified **payload** `{ id, name, image, custom }` — not a DB document. Use `req.user.id`; there is no `_id`.
 - [requireAdmin](src/http/middlewares/requireAdmin.ts) goes after `auth`. It re-reads the user and checks `custom.isAdmin`; it never trusts the token's claim.
 
-Login is passwordless: `POST /api/sparklers/auth-code` mails a 4-digit code (bcrypt-hashed onto the user), and `/auth-code/verify` exchanges it for a JWT. There are also `/auth-google`, `/quick`, and an anonymous `/guest` path. Sign-in endpoints return the JWT as a **bare, unquoted `text/html` body** *and* in the `x-auth-token` header (use `legacyText` + `withAuthToken` from [src/http/respond.ts](src/http/respond.ts); never `res.json` it). Clients replace their stored token whenever a response carries a new `x-auth-token`.
+Clients authenticate with Firebase, then exchange the identity at `POST /api/sparklers/quick`, which finds or creates the Sparkler by email. It and `PATCH /api/sparklers` return the JWT as a **bare, unquoted `text/html` body** *and* in the `x-auth-token` header (use `legacyText` + `withAuthToken` from [src/http/respond.ts](src/http/respond.ts); never `res.json` it). Clients replace their stored token whenever a response carries a new `x-auth-token`.
 
 ### The `Sparkler` model is the user model
 
-[src/models/sparkler.ts](src/models/sparkler.ts). App-specific state lives in the `custom` object, typed as `SparklerCustom` in [src/domain/user.types.ts](src/domain/user.types.ts). In Mongo it is an unschema'd `Object`, so Mongoose validates nothing inside it and a `findByIdAndUpdate` with a partial `custom` **replaces** the whole object — update individual keys with dotted paths (`"custom.username"`). `custom` holds the permission flags (`isAdmin`, `verified`), so never write it from a request body.
+[src/models/sparkler.ts](src/models/sparkler.ts). App-specific state lives in the `custom` object, typed as `SparklerCustom` in [src/domain/user.types.ts](src/domain/user.types.ts). In Mongo it is an unschema'd `Object`, so Mongoose validates nothing inside it and a `findByIdAndUpdate` with a partial `custom` **replaces** the whole object — update individual keys with dotted paths (`"custom.username"`). `custom` holds the permission flags (`isAdmin`, `verified`), so never write it from a request body: the PATCH routes write only `name`, `image`, `custom.username` and the `PROFILE_STRING_FIELDS` / `isProfilePrivate` whitelist in [src/domain/user.types.ts](src/domain/user.types.ts). Mobile sends its whole stored `custom` back on every edit, so that whitelist is what stops it from setting `isAdmin`.
 
 Reference the user model as `ref: "Sparkler"`.
 
@@ -75,23 +88,28 @@ Reference the user model as `ref: "Sparkler"`.
 
 Stream returns a user's `custom` object on **every** user record it embeds — in activities, comments, reactions and member lists — so anything placed there is readable by every other signed-in user. A prior version stored `feedToken` in `custom`, which leaked every account's Stream token to every other account.
 
-The invariant: **`feedToken` is minted on demand, scoped to the caller, and never persisted to Mongo or written to Stream.**
+The invariant: **`feedToken` is minted per issue, travels only inside its own user's JWT, and is never persisted to Mongo or written to Stream.**
 
 - `toStreamUser(doc)` in [src/services/users.ts](src/services/users.ts) is the single definition of what Stream may see; every `upsertUsers` call goes through it. Its return type `StreamUserCustom` ([src/domain/stream.types.ts](src/domain/stream.types.ts)) maps the credential keys to `never`, so the compiler rejects a `custom` carrying one.
-- `toPublicUser(doc)` is the equivalent for API responses — it drops the bcrypt `authCode` hash. Never `res.send` a raw or populated Sparkler document.
-- Clients get a feed token from `GET /api/sparklers/feed-token` (auth required), which mints one for `req.user.id` only via `createFeedToken` in [src/services/stream.ts](src/services/stream.ts).
+- `toDirectoryUser(doc)` is the equivalent for API responses. The directory is **unauthenticated**, so it carries no `email` and uses the same `never` guard. Never `res.send` a raw Sparkler document.
+- `issueAuthToken(doc)` in [src/services/authToken.ts](src/services/authToken.ts) builds every JWT: a whitelisted `custom` (`username`, `verified`, `isAdmin`) plus a `feedToken` from `createFeedToken` in [src/services/stream.ts](src/services/stream.ts). Both clients connect Stream Feeds and Chat with that token.
+- Feed tokens are **permanent** (`generatePermanentUserToken`; `generateUserToken` without a validity silently defaults to one hour). The clients cache their JWT and never check `exp`, so an expiring token would break feeds once it lapsed. To kill tokens, run [scripts/revoke-stream-tokens.ts](scripts/revoke-stream-tokens.ts). Add an expiry only once the clients re-authenticate on it.
 
 ### Stream integration
 
-Two Stream SDKs coexist, both built lazily in [src/services/stream.ts](src/services/stream.ts): `stream-chat` (`chatClient()`, chat tokens) and `@stream-io/node-sdk` (`streamClient()`: users, guests, membership levels). Mongo is the source of truth; Stream is kept in sync by `upsertUsers` after user writes, and a Stream failure is logged rather than failing the request. Admin-only `PATCH /api/sparklers/sync` batch-replays all users into Stream, and `PATCH /api/sparklers/verify` bulk-verifies by email.
+One SDK, `@stream-io/node-sdk`, built lazily by `streamClient()` in [src/services/stream.ts](src/services/stream.ts). The server only syncs users, deletes them, and mints tokens; the clients talk to Stream directly for everything else (feeds, chat, moderation flags, and push devices on web). Mongo is the source of truth; Stream is kept in sync by `upsertUsers` after user writes, and a Stream failure is logged rather than failing the request. Admin-only `PATCH /api/sparklers/sync` batch-replays all users into Stream, and `PATCH /api/sparklers/verify` bulk-verifies by email.
 
 ### Validation
 
-Joi validators are exported alongside the schema from the model file (`export const validateX`) and applied with `validate(validateX)` from [src/http/middlewares/validate.ts](src/http/middlewares/validate.ts), which 400s with Joi's first message as `error`. Most routes validate inline instead. (`zod` is also installed and handled by `toAppError`.)
+Routes validate inline and throw `BadRequestError` (or answer 400) with a string `error`. `zod` is installed and mapped by `toAppError` should a route want schema validation.
+
+### Mail
+
+[src/routes/mails.ts](src/routes/mails.ts) sends admin announcements through Resend. [src/services/mailTemplate.ts](src/services/mailTemplate.ts) renders the branded, table-based, inline-styled HTML plus a plain-text part. `message` is plain text (a blank line starts a paragraph) and is HTML-escaped. `sendBulkMail` gives each recipient their **own** email via Resend's batch API. Never put a list of users in one `to`, which exposes every address to every recipient. Use `POST /mails/preview` to see an email before sending it.
 
 ## Known landmines
 
-- [src/routes/communities.ts](src/routes/communities.ts): `GET /levels` is declared after `GET /:communityId`, so it is unreachable (400s as a bad id). `PATCH /:communityId` forwards `req.body` to `findByIdAndUpdate` with no creator check, so any signed-in user can edit any community, including `creator`, `members` and `isVerified`. `POST /` spreads the body after `creator`, so a caller can attribute a community to someone else.
-- `POST /api/sparklers/auth-code/verify` accepts any code starting `6158` for emails starting `augustineawuori95@gmail.com` — a hard-coded bypass.
-- `POST /api/reports` accepts unauthenticated writes and `GET /api/verifications` unauthenticated reads (both recorded in the baseline).
+- `POST /api/sparklers/quick` trusts the `email` in the body. There is no Firebase ID-token check, so anyone who knows a user's email can sign in as them. The fix is verifying the Firebase ID token server-side (the clients already hold one).
+- `POST /api/pushTokens/send-to-all` lets any signed-in user push to every device.
+- Announcement mail has no unsubscribe (`List-Unsubscribe`); Gmail and Yahoo require one-click unsubscribe for bulk senders past 5k/day.
 - `custom.username` has no unique index (`custom` is unschema'd), so duplicate usernames are possible despite `findUniqueUsername`.

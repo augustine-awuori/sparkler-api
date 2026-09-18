@@ -4,9 +4,12 @@
  * Records what the API returns TODAY, before the TypeScript migration moves any
  * code. Its job is to fail loudly if a refactor changes bytes a client can see.
  *
- * Expectations that encode a KNOWN BUG are marked `// FIXED IN PHASE n`. When
- * that phase lands, the expectation is edited in the same commit — which makes
- * the behaviour-change ledger reviewable as a diff rather than a prose list.
+ * An expectation that changes is edited in the same commit as the code, with a
+ * `CHANGED IN ...` / `REMOVED IN ...` comment — which makes the behaviour-change
+ * ledger reviewable as a diff rather than a prose list.
+ *
+ * The surface is exactly what the mobile (SparklerMobile) and web (sparkler_web)
+ * clients call, plus the admin-only mails and sparkler ops routes.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Application } from "express";
@@ -24,6 +27,18 @@ let api: () => request.Agent;
 const userToken = (id: string, custom: Record<string, unknown> = {}) =>
   jwt.sign({ id, name: "Contract", custom }, process.env.jwtPrivateKey as string);
 
+const unique = (label: string) =>
+  `${label}${Date.now()}${Math.random().toString(36).slice(2, 8)}@example.com`;
+
+const Sparkler = () => mongoose.model("Sparkler");
+
+type StoredUser = { name: string; custom: Record<string, unknown> };
+
+async function createUser(custom: Record<string, unknown> = {}) {
+  const user = await Sparkler().create({ email: unique("user"), name: "Contract User", custom });
+  return { id: user._id.toString(), token: userToken(user._id.toString()) };
+}
+
 beforeAll(async () => {
   const config = loadConfig();
   await connectDb(config.databaseUrl);
@@ -37,36 +52,84 @@ afterAll(async () => {
 });
 
 describe("unauthenticated reads", () => {
-  it.each([
-    ["/api/schools", 200, "array"],
-    ["/api/communities", 200, "array"],
-    ["/api/bugs", 200, "array"],
-    ["/api/alumnis", 200, "array"],
-    ["/api/departments", 200, "array"],
-    ["/api/programmes", 200, "array"],
-    ["/api/verifications", 200, "array"], // FIXED IN PHASE 6 — will require auth
-  ])("GET %s -> %i, %s body", async (path, status, shape) => {
-    const res = await api().get(path);
-    expect(res.status).toBe(status);
-    expect(Array.isArray(res.body)).toBe(shape === "array");
+  it("GET /api/schools -> 200 array", async () => {
+    const res = await api().get("/api/schools");
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
     expect(res.type).toBe("application/json");
   });
 
-  it("GET /api/alumnis/count returns a bare {count}", async () => {
-    const res = await api().get("/api/alumnis/count");
+  it("GET /api/sparklers is a public directory with no email or credentials", async () => {
+    // CHANGED IN THE CLIENT TRIM (was 401): both clients load the directory
+    // without a token, so it is public — and therefore carries no email and no
+    // credential, only the whitelisted profile fields.
+    await Sparkler().create({
+      email: unique("dir"),
+      name: "Directory",
+      custom: { username: "dir-user", bio: "hi", feedToken: "LEAK", isAdmin: false },
+    });
+    const res = await api().get("/api/sparklers");
     expect(res.status).toBe(200);
-    expect(Object.keys(res.body)).toEqual(["count"]);
-    expect(typeof res.body.count).toBe("number");
+    expect(Array.isArray(res.body)).toBe(true);
+
+    const entry = (res.body as Array<{ createdAt: unknown; custom: Record<string, unknown> }>).find(
+      (u) => u.custom.username === "dir-user",
+    );
+    expect(entry?.custom.bio).toBe("hi");
+    expect(typeof entry?.createdAt).toBe("string");
+    expect(JSON.stringify(res.body)).not.toMatch(/email|feedToken|authCode|LEAK/);
+  });
+
+  it("GET /api/sparklers/:id -> the same projection, 404 when unknown", async () => {
+    const { id } = await createUser({ username: "by-id", campus: "Main" });
+    const res = await api().get(`/api/sparklers/${id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(id);
+    expect(res.body.custom.campus).toBe("Main");
+    expect(res.body.email).toBeUndefined();
+
+    const missing = await api().get(`/api/sparklers/${new mongoose.Types.ObjectId().toString()}`);
+    expect(missing.status).toBe(404);
+    expect((await api().get("/api/sparklers/not-an-id")).status).toBe(404);
+  });
+});
+
+describe("removed routers", () => {
+  // REMOVED IN THE CLIENT TRIM: neither client calls these, so they 404 now.
+  it.each([
+    "/api/alumnis",
+    "/api/bugs",
+    "/api/communities",
+    "/api/departments",
+    "/api/programmes",
+    "/api/reports",
+    "/api/verifications",
+  ])("GET %s -> 404", async (path) => {
+    expect((await api().get(path)).status).toBe(404);
+  });
+
+  it.each([
+    "/api/chatToken",
+    "/api/grao",
+    "/api/issues",
+    "/api/feedback",
+    "/api/sparklers/auth-code",
+    "/api/sparklers/auth-google",
+  ])("POST %s -> 404", async (path) => {
+    expect((await api().post(path).send({})).status).toBe(404);
   });
 });
 
 describe("auth gating", () => {
   const unauthenticated: ReadonlyArray<[string, () => request.Test]> = [
-    ["GET /api/sparklers", () => api().get("/api/sparklers")],
-    ["GET /api/sparklers/feed-token", () => api().get("/api/sparklers/feed-token")],
     ["PATCH /api/sparklers", () => api().patch("/api/sparklers")],
+    [
+      "PATCH /api/sparklers/:id",
+      () => api().patch(`/api/sparklers/${new mongoose.Types.ObjectId().toString()}`),
+    ],
+    ["DELETE /api/sparklers", () => api().delete("/api/sparklers")],
     ["POST /api/pushTokens", () => api().post("/api/pushTokens")],
-    ["GET /api/reports", () => api().get("/api/reports")],
+    ["POST /api/mails/all", () => api().post("/api/mails/all")],
   ];
 
   it.each(unauthenticated)("%s without a token -> 401", async (_label, call) => {
@@ -78,15 +141,21 @@ describe("auth gating", () => {
   it("a malformed token -> 401", async () => {
     // CHANGED IN THE TS PORT (was 400): routes now use authenticate() instead
     // of the legacy middlewares/auth.js, which answered 400 for a bad token.
-    const res = await api().get("/api/sparklers").set("x-auth-token", "garbage");
+    const res = await api().patch("/api/sparklers").set("x-auth-token", "garbage");
     expect(res.status).toBe(401);
     expect(res.body.error).toBe("Invalid token. User doesn't exist");
   });
 
-  it("admin-only routes reject a non-admin with 403", async () => {
-    const res = await api()
-      .patch("/api/sparklers/sync")
-      .set("x-auth-token", userToken(new mongoose.Types.ObjectId().toString()));
+  it.each([
+    ["PATCH", "/api/sparklers/sync"],
+    ["POST", "/api/mails/preview"],
+    ["POST", "/api/mails/all"],
+  ])("admin-only %s %s rejects a non-admin with 403", async (method, path) => {
+    // The token's isAdmin claim is not trusted — only the database flag is.
+    const token = userToken(new mongoose.Types.ObjectId().toString(), { isAdmin: true });
+    const res = await (method === "PATCH" ? api().patch(path) : api().post(path))
+      .set("x-auth-token", token)
+      .send({ subject: "s", message: "m" });
     expect(res.status).toBe(403);
   });
 });
@@ -115,88 +184,172 @@ describe("sign-in returns a BARE JWT string, not JSON", () => {
   // The single most breakable contract in the API: the body is an unquoted JWT
   // served as text/html. Wrapping it in res.json() would add quotes and silently
   // break any client that uses the body directly as a header value.
-  it.each(["/api/sparklers/quick", "/api/sparklers/auth-google"])(
-    "POST %s",
-    async (path) => {
-      const email = `contract${Date.now()}${path.replace(/\W/g, "")}@example.com`;
-      const res = await api().post(path).send({ email, name: "Contract User" });
+  it("POST /api/sparklers/quick", async () => {
+    const res = await api()
+      .post("/api/sparklers/quick")
+      .send({ email: unique("quick"), name: "Contract User" });
 
-      expect(res.status).toBe(200);
-      expect(res.type).toBe("text/html");
-      expect(res.text).toMatch(/^eyJ[\w-]+\.[\w-]+\.[\w-]+$/);
-      expect(res.text.startsWith('"')).toBe(false);
-      expect(res.headers["x-auth-token"]).toBe(res.text);
-    },
-  );
+    expect(res.status).toBe(200);
+    expect(res.type).toBe("text/html");
+    expect(res.text).toMatch(/^eyJ[\w-]+\.[\w-]+\.[\w-]+$/);
+    expect(res.text.startsWith('"')).toBe(false);
+    expect(res.headers["x-auth-token"]).toBe(res.text);
+  });
+
+  it("the JWT carries a feedToken for its own user, and nothing else in custom", async () => {
+    // CHANGED IN THE CLIENT TRIM (was absent): both clients connect Stream
+    // Feeds and Chat with custom.feedToken straight out of the JWT.
+    const res = await api()
+      .post("/api/sparklers/quick")
+      .send({ email: unique("claims"), name: "Claims" });
+    const claims = jwt.decode(res.text) as { id: string; custom: Record<string, unknown> };
+
+    expect(Object.keys(claims.custom).sort()).toEqual([
+      "feedToken",
+      "isAdmin",
+      "username",
+      "verified",
+    ]);
+    const feed = jwt.decode(claims.custom.feedToken as string) as { user_id: string; exp?: number };
+    expect(feed.user_id).toBe(claims.id);
+    // Permanent on purpose: clients reuse the cached JWT without checking exp.
+    expect(feed.exp).toBeUndefined();
+
+    // Minted, never stored.
+    const stored = await Sparkler().findById(claims.id).lean<StoredUser>();
+    expect(stored?.custom.feedToken).toBeUndefined();
+  });
 
   it("x-auth-token IS exposed to browsers", async () => {
     // CHANGED IN PHASE 3 (was absent): cors now sets exposedHeaders, so a
     // browser client can finally read the header the API tells it to read.
     const res = await api()
       .post("/api/sparklers/quick")
-      .send({ email: `cors${Date.now()}@example.com`, name: "Cors" });
+      .send({ email: unique("cors"), name: "Cors" });
     expect(res.headers["access-control-expose-headers"]).toContain("x-auth-token");
   });
 });
 
-describe("known-broken endpoints (each fixed in a later phase)", () => {
-  it("POST /api/chatToken reads req.user.id", async () => {
-    // CHANGED IN THE TS PORT (was 500 on every call): it read req.user._id,
-    // which the token payload never has. An unknown user now gets the route's
-    // own 404, and a real one gets a bare chat token plus a fresh x-auth-token.
-    const unknown = await api()
-      .post("/api/chatToken")
-      .set("x-auth-token", userToken(new mongoose.Types.ObjectId().toString()));
-    expect(unknown.status).toBe(404);
-
-    const Sparkler = mongoose.model("Sparkler");
-    const user = await Sparkler.create({ email: `chat${Date.now()}@example.com`, name: "Chat" });
+describe("profile updates", () => {
+  it("PATCH writes whitelisted profile fields and ignores permission flags", async () => {
+    // CHANGED IN THE CLIENT TRIM (only name/image/username were saved): the
+    // profile fields are writable. Mobile sends its whole stored custom back,
+    // so isAdmin/verified/feedToken in the body must be ignored.
+    const { id, token } = await createUser({ username: "before" });
     const res = await api()
-      .post("/api/chatToken")
-      .set("x-auth-token", userToken(user._id.toString()));
+      .patch("/api/sparklers")
+      .set("x-auth-token", token)
+      .send({
+        name: "After",
+        custom: {
+          username: "after-name",
+          bio: "New bio",
+          isProfilePrivate: true,
+          isAdmin: true,
+          verified: true,
+          feedToken: "x",
+        },
+      });
+
     expect(res.status).toBe(200);
-    expect(res.text).toMatch(/^eyJ[\w-]+\.[\w-]+\.[\w-]+$/);
-    expect(typeof res.headers["x-auth-token"]).toBe("string");
-  });
+    expect(res.type).toBe("text/html");
+    expect(res.headers["x-auth-token"]).toBe(res.text);
 
-  it("GET /api/communities/levels is shadowed by GET /:communityId", async () => {
-    // FIXED IN PHASE 6 — declared before the parameterised route.
-    // CHANGED IN PHASE 3 (was 500): "levels" is still fed to findById as an
-    // id, but toAppError now maps the CastError to a 400 instead of letting
-    // Express's default handler answer with a 500. Route ordering is fixed in
-    // Phase 6, which will make this a real 200.
-    const res = await api().get("/api/communities/levels");
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe("bad_request");
-  });
-
-  it("GET /api/reports admits an admin and rejects everyone else", async () => {
-    // CHANGED IN THE TS PORT (was 403 for everyone): isAuthorised read
-    // user.isAdmin, but the flag lives under custom.isAdmin.
-    const Sparkler = mongoose.model("Sparkler");
-    const admin = await Sparkler.create({
-      email: `admin${Date.now()}@example.com`,
-      name: "Admin",
-      custom: { isAdmin: true },
+    const stored = await Sparkler().findById(id).lean<StoredUser>();
+    expect(stored?.name).toBe("After");
+    expect(stored?.custom).toMatchObject({
+      username: "after-name",
+      bio: "New bio",
+      isProfilePrivate: true,
     });
-    const res = await api()
-      .get("/api/reports")
-      .set("x-auth-token", userToken(admin._id.toString(), { isAdmin: true }));
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-
-    // The token's claim is not trusted — only the database flag is.
-    const nobody = await api()
-      .get("/api/reports")
-      .set("x-auth-token", userToken(new mongoose.Types.ObjectId().toString(), { isAdmin: true }));
-    expect(nobody.status).toBe(403);
+    expect(stored?.custom.isAdmin).toBeUndefined();
+    expect(stored?.custom.verified).toBeUndefined();
+    expect(stored?.custom.feedToken).toBeUndefined();
   });
 
-  it("POST /api/reports accepts an unauthenticated write", async () => {
-    // FIXED IN PHASE 6 — will require auth.
-    const res = await api()
-      .post("/api/reports")
-      .send({ title: "Contract", description: "baseline probe" });
+  it("PATCH with another user's username -> 409; re-sending your own is fine", async () => {
+    await createUser({ username: "taken-name" });
+    const { token } = await createUser({ username: "mine" });
+
+    const clash = await api()
+      .patch("/api/sparklers")
+      .set("x-auth-token", token)
+      .send({ custom: { username: "taken-name" } });
+    expect(clash.status).toBe(409);
+
+    const same = await api()
+      .patch("/api/sparklers")
+      .set("x-auth-token", token)
+      .send({ custom: { username: "mine" } });
+    expect(same.status).toBe(200);
+  });
+
+  it("PATCH /:id edits only the caller's own record", async () => {
+    const me = await createUser();
+    const other = await createUser();
+
+    const forbidden = await api()
+      .patch(`/api/sparklers/${other.id}`)
+      .set("x-auth-token", me.token)
+      .send({ name: "Hijack" });
+    expect(forbidden.status).toBe(403);
+
+    const own = await api()
+      .patch(`/api/sparklers/${me.id}`)
+      .set("x-auth-token", me.token)
+      .send({ custom: { website: "https://me.example" } });
+    expect(own.status).toBe(200);
+  });
+
+  it("DELETE removes the caller and their push token", async () => {
+    const { id, token } = await createUser();
+    await api()
+      .post("/api/pushTokens")
+      .set("x-auth-token", token)
+      .send({ pushToken: "ExponentPushToken[x]" });
+
+    const res = await api().delete("/api/sparklers").set("x-auth-token", token);
     expect(res.status).toBe(200);
+    expect(await Sparkler().findById(id)).toBeNull();
+    expect(await mongoose.model("PushToken").findOne({ userId: id })).toBeNull();
+  });
+});
+
+describe("mails (admin)", () => {
+  let adminToken: string;
+
+  beforeAll(async () => {
+    adminToken = (await createUser({ isAdmin: true })).token;
+  });
+
+  it("POST /preview renders the announcement without sending", async () => {
+    const res = await api().post("/api/mails/preview").set("x-auth-token", adminToken).send({
+      subject: "News",
+      heading: "Hello",
+      message: "<b>Bold</b> news",
+      ctaLabel: "Open",
+      ctaUrl: "https://sparkler.website/",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.type).toBe("text/html");
+    expect(res.text).toContain("&lt;b&gt;Bold&lt;/b&gt;");
+    expect(res.text).toContain('href="https://sparkler.website/"');
+  });
+
+  it.each([
+    [{ message: "no subject" }, "Subject and message are required"],
+    [
+      { subject: "s", message: "m", ctaLabel: "Open" },
+      "ctaLabel and ctaUrl must be provided together",
+    ],
+    [
+      { subject: "s", message: "m", ctaLabel: "Open", ctaUrl: "javascript:alert(1)" },
+      "ctaUrl must be an https:// URL",
+    ],
+  ])("rejects %j with 400", async (body, error) => {
+    const res = await api().post("/api/mails/preview").set("x-auth-token", adminToken).send(body);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe(error);
   });
 });

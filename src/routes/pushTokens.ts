@@ -8,7 +8,17 @@ import { sendPushNotificationTo } from "../utils/pushNotifications.js";
 interface NotificationBody {
   message?: string;
   title?: string;
-  [key: string]: unknown;
+  data?: unknown;
+}
+
+// Only these reach Expo. Spreading the whole body let a caller pass `to` and
+// redirect the notification to arbitrary devices.
+function payloadOf({ message = "", title, data }: NotificationBody) {
+  return {
+    message,
+    ...(typeof title === "string" && { title }),
+    ...(data !== null && typeof data === "object" && { data }),
+  };
 }
 
 const router = Router();
@@ -36,7 +46,7 @@ router.post(
   auth,
   authedHandler<Record<string, string>, NotificationBody & { userIds?: unknown }>(
     async (req, res) => {
-      const { userIds, message, title, ...other } = req.body;
+      const { userIds, message } = req.body;
       if (!userIds || !Array.isArray(userIds) || !message)
         return res.status(400).json({ error: "Missing user ID or message" });
 
@@ -44,7 +54,7 @@ router.post(
 
       await sendPushNotificationTo(
         tokens.map((token) => token.pushToken),
-        { message, title, ...other },
+        payloadOf(req.body),
       );
       res.send({ success: true });
     },
@@ -55,7 +65,7 @@ router.post(
   "/send-to-all",
   auth,
   authedHandler<Record<string, string>, NotificationBody>(async (req, res) => {
-    const { message, title, ...other } = req.body;
+    const { message } = req.body;
     if (!message) return res.status(400).json({ error: "Missing user ID or message" });
 
     // Everyone except the sender.
@@ -63,7 +73,7 @@ router.post(
 
     await sendPushNotificationTo(
       tokens.map((token) => token.pushToken),
-      { message, title, ...other },
+      payloadOf(req.body),
     );
     res.send({ success: true });
   }),

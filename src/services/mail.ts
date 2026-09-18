@@ -1,7 +1,12 @@
-import Mailgen from "mailgen";
 import { Resend } from "resend";
 
 import { config } from "../config/index.js";
+import { logger } from "../utils/logger.js";
+import { renderAnnouncement, type AnnouncementContent } from "./mailTemplate.js";
+
+const FROM = "Sparkler <hello@sparkler.website>";
+/** Resend's per-request limit for batch sends. */
+const BATCH_SIZE = 100;
 
 let resend: Resend | undefined;
 
@@ -10,35 +15,50 @@ function client(): Resend {
   return resend;
 }
 
-const mailGenerator = new Mailgen({
-  theme: "default",
-  product: {
-    name: "Sparkler",
-    link: "https://sparkler.website/",
-    logo: "",
-  },
-});
-
-export interface MailInput {
-  message: string;
-  to: string | string[];
+export interface MailInput extends AnnouncementContent {
+  to: string;
   subject: string;
 }
 
-export async function sendMail({ message, to, subject }: MailInput) {
-  const html = mailGenerator.generate({
-    body: {
-      name: "Sparkler",
-      intro: message,
-      outro: "Connect with ease!",
-    },
-  });
+/** One announcement to one recipient. Returns Resend's `{ data, error }`. */
+export async function sendMail({ to, subject, ...content }: MailInput) {
+  const { html, text } = renderAnnouncement(content);
 
-  return await client().emails.send({
-    from: "Sparkler@sparkler.website",
-    to,
-    subject,
-    html,
-    text: html ? "" : `Hello, ${message}`,
-  });
+  return await client().emails.send({ from: FROM, to, subject, html, text });
+}
+
+export interface BulkMailResult {
+  sent: number;
+  failed: number;
+}
+
+/**
+ * The same announcement to many recipients, each as their OWN email — never
+ * one message with everyone in `to`, which showed every address to every
+ * recipient. A failed batch is logged and counted; the rest still go out.
+ */
+export async function sendBulkMail(
+  recipients: readonly string[],
+  subject: string,
+  content: AnnouncementContent,
+): Promise<BulkMailResult> {
+  const { html, text } = renderAnnouncement(content);
+  const result: BulkMailResult = { sent: 0, failed: 0 };
+
+  for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+    const batch = recipients.slice(i, i + BATCH_SIZE);
+
+    try {
+      const { error } = await client().batch.send(
+        batch.map((to) => ({ from: FROM, to, subject, html, text })),
+      );
+      if (error) throw new Error(error.message);
+      result.sent += batch.length;
+    } catch (err) {
+      logger().error({ err, batch: i / BATCH_SIZE + 1 }, "Bulk mail batch failed");
+      result.failed += batch.length;
+    }
+  }
+
+  return result;
 }

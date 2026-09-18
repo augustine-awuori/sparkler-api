@@ -1,6 +1,7 @@
 import { isValidObjectId } from "mongoose";
 
-import type { PublicUser, StreamSourceDoc, StreamUser } from "../domain/stream.types.js";
+import type { DirectoryUser, StreamSourceDoc, StreamUser } from "../domain/stream.types.js";
+import { PROFILE_STRING_FIELDS, type SparklerProfile } from "../domain/user.types.js";
 import { Sparkler, type SparklerDoc } from "../models/sparkler.js";
 
 function generateUsername(name: string): string {
@@ -49,19 +50,44 @@ export function toStreamUser(doc: StreamSourceDoc): StreamUser {
   };
 }
 
-// Shape of a Sparkler as returned to an API caller. Drops the bcrypt `authCode`
-// hash and reuses the Stream whitelist for `custom`.
-export function toPublicUser(doc: StreamSourceDoc): PublicUser {
+/** Only the whitelisted profile fields, and only when they have the right type. */
+export function pickProfile(source: Record<string, unknown> | null | undefined): SparklerProfile {
+  const profile: SparklerProfile = {};
+  if (!source) return profile;
+
+  for (const key of PROFILE_STRING_FIELDS) {
+    const value = source[key];
+    if (typeof value === "string") profile[key] = value;
+  }
+  if (typeof source.isProfilePrivate === "boolean")
+    profile.isProfilePrivate = source.isProfilePrivate;
+
+  return profile;
+}
+
+// A Sparkler as the public directory shows it. GET /api/sparklers is
+// unauthenticated, so this carries no email and no credential of any kind: the
+// Stream whitelist's permission flags plus the user's own profile fields.
+export function toDirectoryUser(doc: StreamSourceDoc): DirectoryUser {
   const { id, name, image, custom } = toStreamUser(doc);
 
   return {
     id,
     name,
     image,
-    email: doc.email ?? "",
-    timestamp: doc.timestamp ?? undefined,
-    custom,
+    ...(doc.timestamp ? { createdAt: new Date(doc.timestamp).toISOString() } : {}),
+    custom: {
+      username: custom.username,
+      verified: custom.verified,
+      isAdmin: custom.isAdmin,
+      ...pickProfile(doc.custom as Record<string, unknown> | null | undefined),
+    },
   };
+}
+
+/** The user (other than `exceptId`) who already holds `username`, if any. */
+export async function isUsernameTaken(username: string, exceptId: string): Promise<boolean> {
+  return (await Sparkler.exists({ "custom.username": username, _id: { $ne: exceptId } })) !== null;
 }
 
 /** Null for a missing user AND for an id that is not an ObjectId (no CastError). */

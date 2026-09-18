@@ -1,68 +1,97 @@
 import { Router } from "express";
 
+import { BadRequestError } from "../domain/errors.js";
 import { handler } from "../http/handler.js";
 import { auth } from "../http/middlewares/authenticate.js";
 import { requireAdmin } from "../http/middlewares/requireAdmin.js";
 import { Sparkler } from "../models/sparkler.js";
-import { sendMail } from "../services/mail.js";
+import { sendBulkMail, sendMail } from "../services/mail.js";
+import { renderAnnouncement, type AnnouncementContent } from "../services/mailTemplate.js";
+
+/**
+ * Admin-only announcements about the app. Every route takes the same body:
+ * { subject, message, heading?, preheader?, ctaLabel?, ctaUrl? }. `message` is
+ * plain text — blank lines start a new paragraph. Try it with POST /preview
+ * before sending to everyone.
+ */
 
 interface MailBody {
-  subject?: string;
-  message?: string;
+  subject?: unknown;
+  message?: unknown;
+  heading?: unknown;
+  preheader?: unknown;
+  ctaLabel?: unknown;
+  ctaUrl?: unknown;
 }
 
-const INCOMPLETE_SUBJECT = "Reminder: Use Your Sparkler Auth Code & App Update Available";
-const INCOMPLETE_MESSAGE = `
-We noticed that you requested an authentication code but haven’t used it yet.
-To access your Sparkler account, please use the code sent in the previous email.
-If the code has expired or you no longer have it, you can request a new one.
+const optionalText = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() ? value.trim() : undefined;
 
-With Auth Code at Sparkler, we're going passwordless—you don't need to remember it.
+/** Validates the body into template content, or throws a 400. */
+function parseMail(body: MailBody | undefined): { subject: string; content: AnnouncementContent } {
+  const subject = optionalText(body?.subject);
+  const message = optionalText(body?.message);
+  if (!subject || !message) throw new BadRequestError("Subject and message are required");
 
-Additionally, we have an update available on the Play Store with new features and improvements.
-Make sure to update your app for the best experience.
-`;
+  const heading = optionalText(body?.heading);
+  const preheader = optionalText(body?.preheader);
+  const ctaLabel = optionalText(body?.ctaLabel);
+  const ctaUrl = optionalText(body?.ctaUrl);
+
+  if (Boolean(ctaLabel) !== Boolean(ctaUrl))
+    throw new BadRequestError("ctaLabel and ctaUrl must be provided together");
+  if (ctaUrl && !isHttpsUrl(ctaUrl)) throw new BadRequestError("ctaUrl must be an https:// URL");
+
+  return {
+    subject,
+    content: {
+      message,
+      ...(heading && { heading }),
+      ...(preheader && { preheader }),
+      ...(ctaLabel && ctaUrl && { cta: { label: ctaLabel, url: ctaUrl } }),
+    },
+  };
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 const router = Router();
+
+// Renders the email without sending it, so an announcement can be checked in a
+// browser before it goes to every user.
+router.post(
+  "/preview",
+  auth,
+  requireAdmin,
+  handler<Record<string, string>, MailBody>((req, res) => {
+    const { content } = parseMail(req.body);
+
+    res.type("html").send(renderAnnouncement(content).html);
+  }),
+);
 
 router.post(
   "/all",
   auth,
   requireAdmin,
   handler<Record<string, string>, MailBody>(async (req, res) => {
-    const { subject, message } = req.body;
-    if (!subject || !message)
-      return res.status(400).send({ error: "Subject and message are required" });
+    const { subject, content } = parseMail(req.body);
 
-    const emails = (await Sparkler.find({})).map((user) => user.email);
-    const { data, error } = await sendMail({ to: emails, message, subject });
+    const emails = (await Sparkler.find({}, { email: 1 }).lean())
+      .map((user) => user.email)
+      .filter(Boolean);
 
-    data
-      ? res.send({ message: "Email sent" })
-      : res.status(500).send({ error: error || "Something failed while sending email" });
-  }),
-);
+    const { sent, failed } = await sendBulkMail(emails, subject, content);
 
-router.post(
-  "/incomplete",
-  auth,
-  requireAdmin,
-  handler(async (_req, res) => {
-    const emails = (await Sparkler.find({}))
-      .filter((user) => user.authCode)
-      .map((user) => user.email);
-
-    if (!emails.length) return res.status(201).send({ message: "No incomplete registrations" });
-
-    const { data } = await sendMail({
-      to: emails,
-      message: INCOMPLETE_MESSAGE,
-      subject: INCOMPLETE_SUBJECT,
-    });
-
-    data
-      ? res.send({ message: "Email sent" })
-      : res.status(500).send({ error: "Something failed while sending email" });
+    sent
+      ? res.send({ message: "Email sent", sent, failed })
+      : res.status(500).send({ error: "Something failed while sending email", sent, failed });
   }),
 );
 
@@ -71,15 +100,13 @@ router.post(
   auth,
   requireAdmin,
   handler<{ email: string }, MailBody>(async (req, res) => {
-    const { subject, message } = req.body;
-    if (!subject || !message)
-      return res.status(400).send({ error: "Subject and message are required" });
+    const { subject, content } = parseMail(req.body);
 
-    const { data } = await sendMail({ to: req.params.email, message, subject });
+    const { data, error } = await sendMail({ to: req.params.email, subject, ...content });
 
     data
       ? res.send({ message: "Email sent" })
-      : res.status(500).send({ error: "Something failed while sending email" });
+      : res.status(500).send({ error: error?.message || "Something failed while sending email" });
   }),
 );
 

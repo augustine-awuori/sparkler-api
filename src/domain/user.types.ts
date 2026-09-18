@@ -1,4 +1,30 @@
 /**
+ * The profile fields a user may set about themselves, and nothing else. PATCH
+ * /api/sparklers writes exactly these (as dotted `custom.<key>` paths) and the
+ * public directory returns exactly these. `isProfilePrivate` is the one boolean.
+ */
+export const PROFILE_STRING_FIELDS = [
+  "bio",
+  "campus",
+  "coverImage",
+  "website",
+  "instagram",
+  "tikTok",
+  "youtube",
+  "linkedIn",
+  "whatsApp",
+  "school",
+  "course",
+  "year",
+] as const;
+
+export type ProfileStringField = (typeof PROFILE_STRING_FIELDS)[number];
+
+export type SparklerProfile = { [K in ProfileStringField]?: string } & {
+  isProfilePrivate?: boolean;
+};
+
+/**
  * Everything the app may store under `Sparkler.custom`.
  *
  * `custom` is an unschema'd Object in Mongo, so Mongoose validates nothing
@@ -6,7 +32,7 @@
  * permission surface (isAdmin, verified) lives here — which is why it must
  * never be written straight from a request body.
  */
-export interface SparklerCustom {
+export interface SparklerCustom extends SparklerProfile {
   username?: string;
   email?: string;
   verified?: boolean;
@@ -35,9 +61,14 @@ export interface AuthTokenClaims extends AuthUser {
   exp?: number;
 }
 
-/** The fields a user is permitted to change about themselves. */
-export interface ProfilePatch {
-  name?: string;
-  image?: string;
-  username?: string;
+/**
+ * The `custom` claims a freshly issued JWT carries. `feedToken` is minted per
+ * issue for the token's own user and is never stored or sent to Stream — the
+ * JWT only ever reaches that user. Clients read `feedToken` and `username`.
+ */
+export interface IssuedTokenCustom {
+  username: string;
+  verified: boolean;
+  isAdmin: boolean;
+  feedToken: string;
 }

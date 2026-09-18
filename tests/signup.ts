@@ -30,10 +30,7 @@ process.env.LOG_LEVEL = "silent";
 process.env.jwtPrivateKey = "test-only-secret-not-used-in-production-0123456789";
 process.env.NEW_FEED_API_KEY = "test_key";
 process.env.NEW_CHAT_API_SECRET = "test_secret_value_for_local_testing_only";
-process.env.chatApiKey = "test_key";
-process.env.chatApiSecret = "test_secret_value_for_local_testing_only";
 process.env.RESEND_API_KEY = "re_test_key";
-process.env.POE_API_KEY = "test";
 
 // A non-literal specifier, so tsc does not try to typecheck the build output.
 const entry = "../dist/index.js";
@@ -68,7 +65,7 @@ const jwtPayload = (token: string | null): Record<string, unknown> =>
 
 const Sparkler = mongoose.model("Sparkler");
 
-for (const route of ["/quick", "/auth-google"]) {
+for (const route of ["/quick"]) {
   const email = `new${Date.now()}${route.replace(/\W/g, "")}@example.com`;
 
   console.log(`\n--- ${route} ---`);
@@ -89,9 +86,14 @@ for (const route of ["/quick", "/auth-google"]) {
   check(`${route} persists no feedToken in mongo`, !("feedToken" in (docs[0]?.custom ?? {})));
   check(`${route} assigned a username`, Boolean(docs[0]?.custom?.username));
 
+  // The clients connect Stream with custom.feedToken straight out of the JWT.
+  // It is minted for this user at issue time and never stored (checked above).
+  const claims = jwtPayload(first.token) as { id: string; custom: Record<string, unknown> };
+  const feedToken = claims.custom.feedToken;
+  check(`${route} JWT carries a feedToken`, typeof feedToken === "string");
   check(
-    `${route} JWT carries no feedToken`,
-    !JSON.stringify(jwtPayload(first.token)).includes("feedToken"),
+    `${route} JWT feedToken is scoped to this user`,
+    jwtPayload(String(feedToken)).user_id === claims.id,
   );
 
   const bad = await post(route, {});
@@ -99,23 +101,15 @@ for (const route of ["/quick", "/auth-google"]) {
 }
 
 console.log("\n--- exposure surface ---");
-const anon = await fetch(BASE);
-check("GET / rejects unauthenticated callers", anon.status === 401, `HTTP ${anon.status}`);
-
-const anonTok = await fetch(`${BASE}/feed-token`);
-check(
-  "GET /feed-token rejects unauthenticated callers",
-  anonTok.status === 401,
-  `HTTP ${anonTok.status}`,
-);
-
-// An ordinary signed-in user listing everyone must not see credentials.
+// The directory is public (both clients load it without a token), so it must
+// carry no email and no credential of any kind.
 const victim = await post("/quick", { email: `victim${Date.now()}@example.com`, name: "Victim" });
-const listed = await fetch(BASE, { headers: { "x-auth-token": victim.token ?? "" } });
-const listBody = await listed.text();
-check("GET / is readable by a signed-in user", listed.status === 200, `HTTP ${listed.status}`);
+const anon = await fetch(BASE);
+const listBody = await anon.text();
+check("GET / is readable without a token", anon.status === 200, `HTTP ${anon.status}`);
 check("GET / leaks no feedToken", !listBody.includes("feedToken"));
 check("GET / leaks no authCode", !listBody.includes("authCode"));
+check("GET / leaks no email", !listBody.includes("@example.com"));
 
 console.log("\n--- PATCH / mass assignment ---");
 
@@ -133,6 +127,11 @@ const escalate = await patch({ name: "Victim", custom: { isAdmin: true } });
 const before = await Sparkler.findById(victimId).lean<SparklerLean>();
 
 check("PATCH / accepts the request", escalate.status === 200, `HTTP ${escalate.status}`);
+const reissued = jwtPayload(escalate.headers.get("x-auth-token")) as {
+  custom?: Record<string, unknown>;
+};
+check("PATCH / reissues a JWT that carries a feedToken", Boolean(reissued.custom?.feedToken));
+check("PATCH / reissued JWT does NOT claim isAdmin", reissued.custom?.isAdmin === false);
 check(
   "PATCH / does NOT grant isAdmin",
   !before?.custom?.isAdmin,

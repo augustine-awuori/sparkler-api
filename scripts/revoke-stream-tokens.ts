@@ -6,10 +6,14 @@
 //
 //   npx tsx --env-file=.env scripts/revoke-stream-tokens.ts --confirm
 //
-// EVERY signed-in user must obtain a new token afterwards (the app does this
-// automatically via GET /api/sparklers/feed-token; older client builds cannot).
+// Also the only way to kill a feed token before its time: the tokens minted into
+// sign-in JWTs (src/services/stream.ts) are permanent.
+//
+// EVERY signed-in user must obtain a new token afterwards. The mobile and web
+// clients cache their JWT, so each must sign in again (clear the stored token)
+// to get a fresh `feedToken` from POST /api/sparklers/quick.
 
-import { StreamChat } from "stream-chat";
+import { StreamClient } from "@stream-io/node-sdk";
 
 import { requireEnv } from "../src/config/env.js";
 
@@ -22,13 +26,13 @@ if (!process.argv.includes("--confirm")) {
 }
 
 const key = requireEnv("NEW_FEED_API_KEY");
-const client = StreamChat.getInstance(key, requireEnv("NEW_CHAT_API_SECRET"));
+const client = new StreamClient(key, requireEnv("NEW_CHAT_API_SECRET"));
 const before = new Date();
 
 console.log(`Revoking all Stream tokens issued before ${before.toISOString()}`);
 console.log(`  app key: ${key}`);
 
-await client.revokeTokens(before);
+await client.updateApp({ revoke_tokens_issued_before: before });
 
 console.log("Done. All previously issued tokens are now invalid.");
 process.exit(0);
