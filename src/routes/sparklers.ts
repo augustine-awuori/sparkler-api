@@ -29,9 +29,9 @@ import type { Logger } from "../utils/logger.js";
 type Params = Record<string, string>;
 
 interface SignInBody {
-  email?: string;
-  name?: string;
-  image?: string;
+  email?: unknown;
+  name?: unknown;
+  image?: unknown;
 }
 
 interface ProfileBody {
@@ -64,24 +64,50 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+const trimmedString = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
+const isDuplicateKey = (error: unknown): boolean =>
+  (error as { code?: unknown } | null)?.code === 11000;
+
+/**
+ * The Sparkler for `email`, created if there is none. `created` is true only
+ * for the request that actually inserted it: when two first sign-ins race, the
+ * loser hits the unique email index and signs into the winner's account.
+ */
+async function findOrCreateSparkler(email: string, name: string, image: string) {
+  const existing = await Sparkler.findOne({ email });
+  if (existing) return { sparkler: existing, created: false };
+
+  const username = await findUniqueUsername(name);
+  try {
+    const sparkler = await new Sparkler({ email, name, image, custom: { username } }).save();
+    return { sparkler, created: true };
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error;
+    const winner = await Sparkler.findOne({ email });
+    if (!winner) throw error;
+    return { sparkler: winner, created: false };
+  }
+}
+
 // The one sign-in path both clients use: they authenticate with Firebase, then
 // exchange the identity here. Finds the Sparkler by email or creates it.
 router.post(
   "/quick",
   handler<Params, SignInBody>(async (req, res) => {
     try {
-      const { email, name, image = "" } = req.body;
+      // Strings only: an object here would reach Mongo as a query operator
+      // (`{ "$ne": null }` would sign in as the first user in the database).
+      const email = trimmedString(req.body?.email);
+      const name = trimmedString(req.body?.name);
+      const image = trimmedString(req.body?.image);
 
       if (!email || !name)
         return res.status(400).send({ error: "Name and email are required" });
 
-      let sparkler = await Sparkler.findOne({ email });
-      if (!sparkler) {
-        const username = await findUniqueUsername(name);
-        sparkler = new Sparkler({ email, name, image, custom: { username } });
-        await sparkler.save();
-        sendInBackground(req.log, [welcomeMail(sparkler)]);
-      }
+      const { sparkler, created } = await findOrCreateSparkler(email, name, image);
+      if (created) sendInBackground(req.log, [welcomeMail(sparkler)]);
 
       await syncToStream(req.log, sparkler);
 

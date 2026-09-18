@@ -253,6 +253,69 @@ describe("sign-in returns a BARE JWT string, not JSON", () => {
   });
 });
 
+describe("first sign-in (email not in the database)", () => {
+  const quick = (body: Record<string, unknown>) => api().post("/api/sparklers/quick").send(body);
+  const claimsOf = (token: string) =>
+    jwt.decode(token) as { id: string; name: string; custom: { username: string } };
+
+  it("creates exactly one account and signs the user into it", async () => {
+    const email = unique("first");
+    const res = await quick({ email, name: "Grace Hopper" });
+    expect(res.status).toBe(200);
+
+    const stored = await Sparkler().find({ email }).lean<(StoredUser & { _id: unknown; image: string })[]>();
+    expect(stored).toHaveLength(1);
+    expect(String(stored[0]?._id)).toBe(claimsOf(res.text).id);
+    expect(stored[0]?.custom.username).toBe("gracehopper");
+    expect(stored[0]?.image).toBe("");
+  });
+
+  it("concurrent first sign-ins for one email all succeed, as one account", async () => {
+    // Clients can fire /quick twice at once (auth listener + screen effect).
+    const email = unique("race");
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, () => quick({ email, name: "Race Condition" })),
+    );
+
+    expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200, 200]);
+    expect(new Set(responses.map((r) => claimsOf(r.text).id)).size).toBe(1);
+    expect(await Sparkler().countDocuments({ email })).toBe(1);
+    await vi.waitFor(() => expect(mailsTo(email)).toHaveLength(1));
+  });
+
+  it("a taken username gets a numeric suffix", async () => {
+    const first = await quick({ email: unique("dup"), name: "Same Name" });
+    const second = await quick({ email: unique("dup"), name: "Same Name" });
+
+    expect(second.status).toBe(200);
+    expect(claimsOf(second.text).custom.username).toMatch(/^samename\d{3}$/);
+    expect(claimsOf(second.text).custom.username).not.toBe(claimsOf(first.text).custom.username);
+  });
+
+  it("surrounding whitespace in the email does not create a second account", async () => {
+    const email = unique("trim");
+    const a = await quick({ email, name: "Trim" });
+    const b = await quick({ email: `  ${email} `, name: "Trim" });
+
+    expect(b.status).toBe(200);
+    expect(claimsOf(b.text).id).toBe(claimsOf(a.text).id);
+  });
+
+  it("a null image is accepted", async () => {
+    expect((await quick({ email: unique("img"), name: "Img", image: null })).status).toBe(200);
+  });
+
+  it.each([
+    ["an object email", { email: { $ne: null }, name: "Injected" }],
+    ["a numeric name", { email: "n@example.com", name: 42 }],
+    ["a whitespace-only name", { email: "ws@example.com", name: "   " }],
+  ])("%s -> 400", async (_label, body) => {
+    const res = await quick(body);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Name and email are required");
+  });
+});
+
 describe("profile updates", () => {
   it("PATCH writes whitelisted profile fields and ignores permission flags", async () => {
     // CHANGED IN THE CLIENT TRIM (only name/image/username were saved): the

@@ -101,7 +101,7 @@ One SDK, `@stream-io/node-sdk`, built lazily by `streamClient()` in [src/service
 
 ### Validation
 
-Routes validate inline and throw `BadRequestError` (or answer 400) with a string `error`. `zod` is installed and mapped by `toAppError` should a route want schema validation.
+Routes validate inline and throw `BadRequestError` (or answer 400) with a string `error`. Check that a body value is a string before it goes into a Mongo filter: an object such as `{ "$ne": null }` is read as a query operator (this once let `/quick` sign in as the first user in the database). `zod` is installed and mapped by `toAppError` should a route want schema validation.
 
 ### Mail
 
