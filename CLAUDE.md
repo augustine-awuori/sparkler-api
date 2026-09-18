@@ -107,6 +107,13 @@ Routes validate inline and throw `BadRequestError` (or answer 400) with a string
 
 [src/routes/mails.ts](src/routes/mails.ts) sends admin announcements through Resend. [src/services/mailTemplate.ts](src/services/mailTemplate.ts) renders the branded, table-based, inline-styled HTML plus a plain-text part. `message` is plain text (a blank line starts a paragraph) and is HTML-escaped. `sendBulkMail` gives each recipient their **own** email via Resend's batch API. Never put a list of users in one `to`, which exposes every address to every recipient. Use `POST /mails/preview` to see an email before sending it.
 
+[src/services/accountMail.ts](src/services/accountMail.ts) holds the automatic account emails, all in the same template:
+- **Welcome:** sent when `/quick` creates an account.
+- **Verified:** sent by `PATCH /verify`, only to users who were not already verified, so re-running a list mails nobody twice.
+- **Account deleted:** sent by `DELETE /sparklers`.
+
+They go out through `sendInBackground`, which never awaits or throws, so a Resend outage cannot fail or slow the request. To add an event, add a `...Mail(recipient)` builder there and call `sendInBackground` from the route. The contract baseline mocks `resend` and asserts on its `outbox`.
+
 ## Known landmines
 
 - `POST /api/sparklers/quick` trusts the `email` in the body. There is no Firebase ID-token check, so anyone who knows a user's email can sign in as them. The fix is verifying the Firebase ID token server-side (the clients already hold one).

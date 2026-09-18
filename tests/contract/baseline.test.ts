@@ -11,7 +11,7 @@
  * The surface is exactly what the mobile (SparklerMobile) and web (sparkler_web)
  * clients call, plus the admin-only mails and sparkler ops routes.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Application } from "express";
 import request from "supertest";
 import jwt from "jsonwebtoken";
@@ -20,6 +20,29 @@ import mongoose from "mongoose";
 import { createApp } from "../../src/app.js";
 import { connectDb, disconnectDb } from "../../src/config/db.js";
 import { loadConfig } from "../../src/config/index.js";
+
+// Resend is replaced so no email leaves the machine; every email the API would
+// send lands in `outbox` instead.
+type SentMail = { to: string; subject: string; text: string };
+const outbox = vi.hoisted(() => [] as SentMail[]);
+vi.mock("resend", () => ({
+  Resend: class {
+    emails = {
+      send: async (mail: SentMail) => {
+        outbox.push(mail);
+        return { data: { id: "test" }, error: null };
+      },
+    };
+    batch = {
+      send: async (mails: SentMail[]) => {
+        outbox.push(...mails);
+        return { data: { data: [] }, error: null };
+      },
+    };
+  },
+}));
+
+const mailsTo = (email: string) => outbox.filter((mail) => mail.to === email);
 
 let app: Application;
 let api: () => request.Agent;
@@ -351,5 +374,54 @@ describe("mails (admin)", () => {
     const res = await api().post("/api/mails/preview").set("x-auth-token", adminToken).send(body);
     expect(res.status).toBe(400);
     expect(res.body.error).toBe(error);
+  });
+});
+
+describe("account emails", () => {
+  // Sent in the background, so each test waits for the outbox to fill.
+  it("a new account gets one welcome email; signing in again sends nothing", async () => {
+    const email = unique("welcome");
+    await api().post("/api/sparklers/quick").send({ email, name: "Ada Lovelace" });
+    await vi.waitFor(() => expect(mailsTo(email)).toHaveLength(1));
+    expect(mailsTo(email)[0]?.subject).toBe("Welcome to Sparkler, Ada");
+
+    await api().post("/api/sparklers/quick").send({ email, name: "Ada Lovelace" });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mailsTo(email)).toHaveLength(1);
+  });
+
+  it("PATCH /verify emails only users who were not already verified", async () => {
+    const adminToken = (await createUser({ isAdmin: true })).token;
+    const fresh = unique("verify");
+    const already = unique("already");
+    await Sparkler().create({ email: fresh, name: "Fresh", custom: {} });
+    await Sparkler().create({ email: already, name: "Already", custom: { verified: true } });
+
+    const verify = () =>
+      api()
+        .patch("/api/sparklers/verify")
+        .set("x-auth-token", adminToken)
+        .send({ emails: [fresh, already] });
+
+    expect((await verify()).status).toBe(200);
+    await vi.waitFor(() => expect(mailsTo(fresh)).toHaveLength(1));
+    expect(mailsTo(fresh)[0]?.subject).toBe("You're verified on Sparkler");
+
+    // Running the same list again mails nobody.
+    await verify();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mailsTo(fresh)).toHaveLength(1);
+    expect(mailsTo(already)).toHaveLength(0);
+  });
+
+  it("DELETE sends a confirmation to the deleted account", async () => {
+    const user = await Sparkler().create({ email: unique("gone"), name: "Gone", custom: {} });
+    await api()
+      .delete("/api/sparklers")
+      .set("x-auth-token", userToken(user._id.toString()));
+
+    await vi.waitFor(() => expect(mailsTo(user.email)).toHaveLength(1));
+    expect(mailsTo(user.email)[0]?.subject).toBe("Your Sparkler account has been deleted");
+    expect(mailsTo(user.email)[0]?.text).toContain("last email");
   });
 });

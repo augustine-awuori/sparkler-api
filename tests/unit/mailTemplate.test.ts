@@ -40,6 +40,14 @@ describe("renderAnnouncement", () => {
     expect(renderAnnouncement({ message: "Hello\n\nthere" }).html).toContain(">Hello there</div>");
   });
 
+  it("uses the footnote, when given, as the footer's reason line", () => {
+    const { html, text } = renderAnnouncement({ message: "m", footnote: "Because <you> asked." });
+
+    expect(html).toContain("Because &lt;you&gt; asked.");
+    expect(html).not.toContain("because you have a Sparkler account");
+    expect(text).toContain("Because <you> asked.");
+  });
+
   it("produces a plain-text part with the heading, message and CTA URL", () => {
     const { text } = renderAnnouncement({
       heading: "What's new",

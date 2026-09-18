@@ -8,6 +8,12 @@ import { requireAdmin } from "../http/middlewares/requireAdmin.js";
 import { legacyText, withAuthToken } from "../http/respond.js";
 import { PushToken } from "../models/pushToken.js";
 import { Sparkler } from "../models/sparkler.js";
+import {
+  accountDeletedMail,
+  sendInBackground,
+  verifiedMail,
+  welcomeMail,
+} from "../services/accountMail.js";
 import { issueAuthToken } from "../services/authToken.js";
 import { streamClient } from "../services/stream.js";
 import {
@@ -74,6 +80,7 @@ router.post(
         const username = await findUniqueUsername(name);
         sparkler = new Sparkler({ email, name, image, custom: { username } });
         await sparkler.save();
+        sendInBackground(req.log, [welcomeMail(sparkler)]);
       }
 
       await syncToStream(req.log, sparkler);
@@ -108,6 +115,13 @@ router.patch(
       if (!Array.isArray(emails) || emails.length === 0)
         return res.status(400).json({ error: "Provide a non-empty array of emails" });
 
+      // Only users not verified before this call get the email, so re-running
+      // the same list does not mail anyone twice.
+      const newlyVerified = await Sparkler.find(
+        { email: { $in: emails }, "custom.verified": { $ne: true } },
+        { email: 1, name: 1 },
+      ).lean();
+
       const updateResult = await Sparkler.updateMany(
         { email: { $in: emails } },
         { $set: { "custom.verified": true } },
@@ -123,16 +137,23 @@ router.patch(
 
       const usersToUpsert = updatedUsers.map(toStreamUser);
 
-      if (usersToUpsert.length > 0) {
-        await streamClient().upsertUsers(usersToUpsert);
-        req.log.info(`Upserted ${usersToUpsert.length} users in Stream`);
+      sendInBackground(req.log, newlyVerified.map(verifiedMail));
+
+      // The users are verified in Mongo either way; PATCH /sync repairs Stream.
+      let upsertedInStream = 0;
+      try {
+        if (usersToUpsert.length > 0) await streamClient().upsertUsers(usersToUpsert);
+        upsertedInStream = usersToUpsert.length;
+        req.log.info(`Upserted ${upsertedInStream} users in Stream`);
+      } catch (err) {
+        req.log.error({ err }, "Stream upsert failed during bulk verify");
       }
 
       res.json({
         message: "Users verified successfully",
         matched: updateResult.matchedCount,
         modified: updateResult.modifiedCount,
-        upsertedInStream: usersToUpsert.length,
+        upsertedInStream,
       });
     } catch (error) {
       req.log.error({ err: error }, "Error during bulk verify");
@@ -231,6 +252,7 @@ router.delete(
     if (!user) throw new NotFoundError("User does not exist in the database");
 
     await PushToken.deleteMany({ userId: user._id });
+    sendInBackground(req.log, [accountDeletedMail(user)]);
 
     try {
       await streamClient().deleteUsers({ user_ids: [user._id.toString()], user: "hard" });

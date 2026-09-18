@@ -13,7 +13,9 @@ const BRAND_SOFT = "#FFD1AC";
 const INK = "#11161F";
 const MUTED = "#6B7280";
 const PAGE = "#FFF7F2";
-const SITE = "https://sparkler.website/";
+const SITE = "https://sparkler.co.ke/";
+const DEFAULT_FOOTNOTE =
+  "You're receiving this because you have a Sparkler account.";
 const FONT =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
@@ -29,6 +31,8 @@ export interface AnnouncementContent {
   cta?: MailCta;
   /** Inbox preview text. Defaults to the start of the message. */
   preheader?: string;
+  /** Why the recipient got this email, shown in the footer. */
+  footnote?: string;
 }
 
 export interface RenderedMail {
@@ -72,7 +76,7 @@ function renderButton({ label, url }: MailCta): string {
 }
 
 export function renderAnnouncement(content: AnnouncementContent): RenderedMail {
-  const { message, heading, cta } = content;
+  const { message, heading, cta, footnote = DEFAULT_FOOTNOTE } = content;
   const year = new Date().getFullYear();
 
   const body = paragraphs(message)
@@ -132,7 +136,7 @@ export function renderAnnouncement(content: AnnouncementContent): RenderedMail {
           </tr>
           <tr>
             <td align="center" style="padding:24px 16px 0;">
-              <p class="muted" style="margin:0 0 6px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">You're receiving this because you have a Sparkler account.</p>
+              <p class="muted" style="margin:0 0 6px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">${escapeHtml(footnote)}</p>
               <p class="muted" style="margin:0;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">&copy; ${year} Sparkler &middot; <a href="${SITE}" target="_blank" style="color:${BRAND};text-decoration:none;">sparkler.website</a></p>
             </td>
           </tr>
@@ -147,7 +151,7 @@ export function renderAnnouncement(content: AnnouncementContent): RenderedMail {
     heading ? `${heading}\n${"=".repeat(heading.length)}` : "",
     paragraphs(message).join("\n\n"),
     cta ? `${cta.label}: ${cta.url}` : "",
-    `--\nYou're receiving this because you have a Sparkler account.\nSparkler - ${SITE}`,
+    `--\n${footnote}\nSparkler - ${SITE}`,
   ]
     .filter(Boolean)
     .join("\n\n");
