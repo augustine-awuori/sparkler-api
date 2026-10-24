@@ -22,15 +22,33 @@ interface SparklerLean {
   custom?: Record<string, unknown>;
 }
 
-const mongod = await MongoMemoryServer.create();
+const mongod = await MongoMemoryServer.create({ instance: { launchTimeout: 60_000 } });
 
 process.env.db = mongod.getUri();
 process.env.PORT = "3999";
 process.env.LOG_LEVEL = "silent";
 process.env.jwtPrivateKey = "test-only-secret-not-used-in-production-0123456789";
+process.env.FIREBASE_API_KEY = "test-firebase-api-key";
 process.env.NEW_FEED_API_KEY = "test_key";
 process.env.NEW_CHAT_API_SECRET = "test_secret_value_for_local_testing_only";
 process.env.RESEND_API_KEY = "re_test_key";
+
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (input, init) => {
+  if (String(input).startsWith("https://identitytoolkit.googleapis.com/v1/accounts:lookup")) {
+    const body = JSON.parse(String(init?.body)) as { idToken: string };
+    return Response.json({
+      users: [
+        {
+          localId: `firebase-${body.idToken.slice("test:".length)}`,
+          email: body.idToken.slice("test:".length),
+          emailVerified: true,
+        },
+      ],
+    });
+  }
+  return realFetch(input, init);
+};
 
 // A non-literal specifier, so tsc does not try to typecheck the build output.
 const entry = "../dist/index.js";
@@ -71,14 +89,14 @@ for (const route of ["/quick"]) {
   console.log(`\n--- ${route} ---`);
 
   // The headline bug: this used to throw a TypeError and return 500.
-  const first = await post(route, { email, name: "New Student" });
+  const first = await post(route, { idToken: `test:${email}`, email, name: "New Student" });
   check(`${route} brand-new email succeeds`, first.status === 200, `HTTP ${first.status}`);
   check(`${route} returns an x-auth-token header`, Boolean(first.token));
 
   // Sign-in must survive Stream being unreachable (fake creds = guaranteed failure).
   check(`${route} succeeds despite Stream being unreachable`, first.status === 200);
 
-  const second = await post(route, { email, name: "New Student" });
+  const second = await post(route, { idToken: `test:${email}`, email, name: "New Student" });
   check(`${route} returning user succeeds`, second.status === 200, `HTTP ${second.status}`);
 
   const docs = await Sparkler.find({ email }).lean<SparklerLean[]>();
@@ -97,13 +115,18 @@ for (const route of ["/quick"]) {
   );
 
   const bad = await post(route, {});
-  check(`${route} rejects empty body with 400`, bad.status === 400, `HTTP ${bad.status}`);
+  check(`${route} rejects empty body with 401`, bad.status === 401, `HTTP ${bad.status}`);
 }
 
 console.log("\n--- exposure surface ---");
 // The directory is public (both clients load it without a token), so it must
 // carry no email and no credential of any kind.
-const victim = await post("/quick", { email: `victim${Date.now()}@example.com`, name: "Victim" });
+const victimEmail = `victim${Date.now()}@example.com`;
+const victim = await post("/quick", {
+  idToken: `test:${victimEmail}`,
+  email: victimEmail,
+  name: "Victim",
+});
 const anon = await fetch(BASE);
 const listBody = await anon.text();
 check("GET / is readable without a token", anon.status === 200, `HTTP ${anon.status}`);

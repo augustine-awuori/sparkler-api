@@ -25,6 +25,12 @@ import { loadConfig } from "../../src/config/index.js";
 // send lands in `outbox` instead.
 type SentMail = { to: string; subject: string; text: string };
 const outbox = vi.hoisted(() => [] as SentMail[]);
+const verifyFirebaseIdTokenMock = vi.hoisted(() =>
+  vi.fn(async (token: string) => ({
+    id: `firebase-${token.slice("test:".length)}`,
+    email: token.slice("test:".length),
+  })),
+);
 vi.mock("resend", () => ({
   Resend: class {
     emails = {
@@ -41,6 +47,9 @@ vi.mock("resend", () => ({
     };
   },
 }));
+vi.mock("../../src/services/firebaseIdentity.js", () => ({
+  verifyFirebaseIdToken: verifyFirebaseIdTokenMock,
+}));
 
 const mailsTo = (email: string) => outbox.filter((mail) => mail.to === email);
 
@@ -52,6 +61,7 @@ const userToken = (id: string, custom: Record<string, unknown> = {}) =>
 
 const unique = (label: string) =>
   `${label}${Date.now()}${Math.random().toString(36).slice(2, 8)}@example.com`;
+const firebaseIdTokenFor = (email: string) => `test:${email}`;
 
 const Sparkler = () => mongoose.model("Sparkler");
 
@@ -184,11 +194,15 @@ describe("auth gating", () => {
 });
 
 describe("error body shape", () => {
-  it("`error` is a top-level string — clients read body.error", async () => {
-    const res = await api().post("/api/sparklers/quick").send({});
-    expect(res.status).toBe(400);
+  // CHANGED IN THIS FIX: /quick now requires proof of the Firebase identity;
+  // body email alone must never establish an account session.
+  it("a quick sign-in without a Firebase ID token is rejected", async () => {
+    const res = await api()
+      .post("/api/sparklers/quick")
+      .send({ email: { $ne: null }, name: "Injected" });
+    expect(res.status).toBe(401);
     expect(typeof res.body.error).toBe("string");
-    expect(res.body.error).toBe("Name and email are required");
+    expect(res.body.error).toBe("Firebase ID token is required");
   });
 
   it("an unknown route returns a JSON 404", async () => {
@@ -208,9 +222,10 @@ describe("sign-in returns a BARE JWT string, not JSON", () => {
   // served as text/html. Wrapping it in res.json() would add quotes and silently
   // break any client that uses the body directly as a header value.
   it("POST /api/sparklers/quick", async () => {
+    const email = unique("quick");
     const res = await api()
       .post("/api/sparklers/quick")
-      .send({ email: unique("quick"), name: "Contract User" });
+      .send({ idToken: firebaseIdTokenFor(email), email, name: "Contract User" });
 
     expect(res.status).toBe(200);
     expect(res.type).toBe("text/html");
@@ -222,10 +237,15 @@ describe("sign-in returns a BARE JWT string, not JSON", () => {
   it("the JWT carries a feedToken for its own user, and nothing else in custom", async () => {
     // CHANGED IN THE CLIENT TRIM (was absent): both clients connect Stream
     // Feeds and Chat with custom.feedToken straight out of the JWT.
+    const email = unique("claims");
     const res = await api()
       .post("/api/sparklers/quick")
-      .send({ email: unique("claims"), name: "Claims" });
-    const claims = jwt.decode(res.text) as { id: string; custom: Record<string, unknown> };
+      .send({ idToken: firebaseIdTokenFor(email), email, name: "Claims" });
+    const claims = jwt.decode(res.text) as {
+      id: string;
+      exp?: number;
+      custom: Record<string, unknown>;
+    };
 
     expect(Object.keys(claims.custom).sort()).toEqual([
       "feedToken",
@@ -233,6 +253,7 @@ describe("sign-in returns a BARE JWT string, not JSON", () => {
       "username",
       "verified",
     ]);
+    expect(claims.exp).toBeUndefined();
     const feed = jwt.decode(claims.custom.feedToken as string) as { user_id: string; exp?: number };
     expect(feed.user_id).toBe(claims.id);
     // Permanent on purpose: clients reuse the cached JWT without checking exp.
@@ -246,15 +267,27 @@ describe("sign-in returns a BARE JWT string, not JSON", () => {
   it("x-auth-token IS exposed to browsers", async () => {
     // CHANGED IN PHASE 3 (was absent): cors now sets exposedHeaders, so a
     // browser client can finally read the header the API tells it to read.
+    const email = unique("cors");
     const res = await api()
       .post("/api/sparklers/quick")
-      .send({ email: unique("cors"), name: "Cors" });
+      .send({ idToken: firebaseIdTokenFor(email), email, name: "Cors" });
     expect(res.headers["access-control-expose-headers"]).toContain("x-auth-token");
   });
 });
 
 describe("first sign-in (email not in the database)", () => {
-  const quick = (body: Record<string, unknown>) => api().post("/api/sparklers/quick").send(body);
+  const quick = (body: Record<string, unknown>) => {
+    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const idToken =
+      typeof body.idToken === "string"
+        ? body.idToken
+        : email
+          ? firebaseIdTokenFor(email)
+          : undefined;
+    return api()
+      .post("/api/sparklers/quick")
+      .send({ ...body, idToken });
+  };
   const claimsOf = (token: string) =>
     jwt.decode(token) as { id: string; name: string; custom: { username: string } };
 
@@ -268,6 +301,32 @@ describe("first sign-in (email not in the database)", () => {
     expect(String(stored[0]?._id)).toBe(claimsOf(res.text).id);
     expect(stored[0]?.custom.username).toBe("gracehopper");
     expect(stored[0]?.image).toBe("");
+  });
+
+  it("uses the verified Firebase email instead of a caller-supplied email", async () => {
+    const verifiedEmail = unique("verified");
+    const claimedEmail = unique("claimed");
+    const res = await quick({
+      idToken: firebaseIdTokenFor(verifiedEmail),
+      email: claimedEmail,
+      name: "Verified identity",
+    });
+
+    expect(res.status).toBe(200);
+    expect(await Sparkler().countDocuments({ email: verifiedEmail })).toBe(1);
+    expect(await Sparkler().countDocuments({ email: claimedEmail })).toBe(0);
+  });
+
+  it("never uses a request-body email object as a Mongo query", async () => {
+    const verifiedEmail = unique("verified-operator");
+    const res = await quick({
+      idToken: firebaseIdTokenFor(verifiedEmail),
+      email: { $ne: null },
+      name: "Verified identity",
+    });
+
+    expect(res.status).toBe(200);
+    expect(await Sparkler().countDocuments({ email: verifiedEmail })).toBe(1);
   });
 
   it("concurrent first sign-ins for one email all succeed, as one account", async () => {
@@ -306,13 +365,12 @@ describe("first sign-in (email not in the database)", () => {
   });
 
   it.each([
-    ["an object email", { email: { $ne: null }, name: "Injected" }],
     ["a numeric name", { email: "n@example.com", name: 42 }],
     ["a whitespace-only name", { email: "ws@example.com", name: "   " }],
   ])("%s -> 400", async (_label, body) => {
     const res = await quick(body);
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe("Name and email are required");
+    expect(res.body.error).toBe("Name must be a non-empty string");
   });
 });
 
@@ -351,6 +409,10 @@ describe("profile updates", () => {
     expect(stored?.custom.isAdmin).toBeUndefined();
     expect(stored?.custom.verified).toBeUndefined();
     expect(stored?.custom.feedToken).toBeUndefined();
+
+    const refreshedClaims = jwt.decode(res.text) as { name: string; custom: { username: string } };
+    expect(refreshedClaims.name).toBe("After");
+    expect(refreshedClaims.custom.username).toBe("after-name");
   });
 
   it("PATCH with another user's username -> 409; re-sending your own is fine", async () => {
@@ -444,11 +506,12 @@ describe("account emails", () => {
   // Sent in the background, so each test waits for the outbox to fill.
   it("a new account gets one welcome email; signing in again sends nothing", async () => {
     const email = unique("welcome");
-    await api().post("/api/sparklers/quick").send({ email, name: "Ada Lovelace" });
+    const payload = { idToken: firebaseIdTokenFor(email), email, name: "Ada Lovelace" };
+    await api().post("/api/sparklers/quick").send(payload);
     await vi.waitFor(() => expect(mailsTo(email)).toHaveLength(1));
     expect(mailsTo(email)[0]?.subject).toBe("Welcome to Sparkler, Ada");
 
-    await api().post("/api/sparklers/quick").send({ email, name: "Ada Lovelace" });
+    await api().post("/api/sparklers/quick").send(payload);
     await new Promise((r) => setTimeout(r, 50));
     expect(mailsTo(email)).toHaveLength(1);
   });

@@ -5,6 +5,7 @@ export interface AppConfig {
   readonly port: number;
   readonly databaseUrl: string;
   readonly jwtSecret: string;
+  readonly firebaseApiKey: string;
   readonly logLevel: string;
   readonly stream: {
     /** Feeds v3 credentials. Clients' chat uses the same Stream app. */
@@ -23,12 +24,15 @@ let cached: AppConfig | undefined;
  */
 export function loadConfig(): AppConfig {
   const env = optionalEnv("NODE_ENV", "development");
+  const appEnv = env === "production" || env === "test" ? env : "development";
 
   cached = {
-    env: env === "production" || env === "test" ? env : "development",
+    env: appEnv,
     port: intEnv("PORT", 3000),
-    databaseUrl: requireEnv("db"),
+    databaseUrl:
+      appEnv === "development" ? "mongodb://127.0.0.1:27017/sparkler-api" : requireEnv("db"),
     jwtSecret: requireEnv("jwtPrivateKey"),
+    firebaseApiKey: requireEnv("FIREBASE_API_KEY"),
     logLevel: optionalEnv("LOG_LEVEL", env === "production" ? "info" : "debug"),
     stream: {
       apiKey: requireEnv("NEW_FEED_API_KEY"),

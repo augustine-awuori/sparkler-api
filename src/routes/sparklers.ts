@@ -1,6 +1,6 @@
 import { Router, type Response } from "express";
 
-import { ConflictError, ForbiddenError, NotFoundError } from "../domain/errors.js";
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from "../domain/errors.js";
 import type { StreamSourceDoc } from "../domain/stream.types.js";
 import { authedHandler, handler, type AuthedRequest } from "../http/handler.js";
 import { auth } from "../http/middlewares/authenticate.js";
@@ -15,6 +15,7 @@ import {
   welcomeMail,
 } from "../services/accountMail.js";
 import { issueAuthToken } from "../services/authToken.js";
+import { verifyFirebaseIdToken } from "../services/firebaseIdentity.js";
 import { streamClient } from "../services/stream.js";
 import {
   findSparklerById,
@@ -29,6 +30,7 @@ import type { Logger } from "../utils/logger.js";
 type Params = Record<string, string>;
 
 interface SignInBody {
+  idToken?: unknown;
   email?: unknown;
   name?: unknown;
   image?: unknown;
@@ -60,12 +62,12 @@ function sendAuthToken(res: Response, sparkler: StreamSourceDoc): void {
   legacyText(withAuthToken(res, token), token);
 }
 
+const trimmedString = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
-
-const trimmedString = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
 
 const isDuplicateKey = (error: unknown): boolean =>
   (error as { code?: unknown } | null)?.code === 11000;
@@ -91,31 +93,29 @@ async function findOrCreateSparkler(email: string, name: string, image: string) 
   }
 }
 
-// The one sign-in path both clients use: they authenticate with Firebase, then
-// exchange the identity here. Finds the Sparkler by email or creates it.
+// The one sign-in path both clients use. The verified Firebase identity, not
+// the request body, determines which Sparkler account may be accessed.
 router.post(
   "/quick",
   handler<Params, SignInBody>(async (req, res) => {
-    try {
-      // Strings only: an object here would reach Mongo as a query operator
-      // (`{ "$ne": null }` would sign in as the first user in the database).
-      const email = trimmedString(req.body?.email);
-      const name = trimmedString(req.body?.name);
-      const image = trimmedString(req.body?.image);
-
-      if (!email || !name)
-        return res.status(400).send({ error: "Name and email are required" });
-
-      const { sparkler, created } = await findOrCreateSparkler(email, name, image);
-      if (created) sendInBackground(req.log, [welcomeMail(sparkler)]);
-
-      await syncToStream(req.log, sparkler);
-
-      sendAuthToken(res, sparkler);
-    } catch (error) {
-      req.log.error({ err: error }, "Error with quick sign-in");
-      res.status(500).send({ error: `Error with quick sign-in ${String(error)}` });
+    if (typeof req.body?.idToken !== "string") {
+      throw new UnauthorizedError("Firebase ID token is required");
     }
+
+    const identity = await verifyFirebaseIdToken(req.body.idToken);
+    const suppliedName = trimmedString(req.body?.name);
+    if (req.body?.name !== undefined && !suppliedName) {
+      return res.status(400).send({ error: "Name must be a non-empty string" });
+    }
+    const name = suppliedName || identity.name || identity.email;
+    const image =
+      typeof req.body?.image === "string" ? req.body.image.trim() : identity.image || "";
+    const { sparkler, created } = await findOrCreateSparkler(identity.email, name, image);
+    if (created) sendInBackground(req.log, [welcomeMail(sparkler)]);
+
+    await syncToStream(req.log, sparkler);
+
+    sendAuthToken(res, sparkler);
   }),
 );
 
