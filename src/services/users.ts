@@ -6,10 +6,12 @@ import {
   parseProfileLocation,
   type SparklerProfile,
 } from "../domain/user.types.js";
+import { isReservedUsername } from "../domain/reservedUsernames.js";
 import { Sparkler, type SparklerDoc } from "../models/sparkler.js";
 
+/** Falls back for a blank name: an account with no username can't be mentioned. */
 function generateUsername(name: string): string {
-  return name.replace(/\s+/g, "").toLowerCase();
+  return name.replace(/\s+/g, "").toLowerCase() || "sparkler";
 }
 
 function generateRandomNumber(): number {
@@ -17,7 +19,7 @@ function generateRandomNumber(): number {
 }
 
 async function findByUsername(username: string) {
-  return await Sparkler.findOne({ "custom.username": username });
+  return isReservedUsername(username) || (await Sparkler.exists({ "custom.username": username }));
 }
 
 export async function findUniqueUsername(name: string): Promise<string> {

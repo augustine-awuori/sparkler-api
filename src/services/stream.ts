@@ -12,10 +12,16 @@ import { config } from "../config/index.js";
 
 let feeds: StreamClient | undefined;
 
+/**
+ * The SDK's default is 3 seconds, which real calls miss. `reachableRecipients` sends
+ * nothing when it can't check blocks, so each miss silently dropped a batch of pushes.
+ */
+export const STREAM_TIMEOUT_MS = 15_000;
+
 /** Feeds v3 (@stream-io/node-sdk): users and upserts. */
 export function streamClient(): StreamClient {
   const { apiKey, apiSecret } = config().stream;
-  feeds ??= new StreamClient(apiKey, apiSecret);
+  feeds ??= new StreamClient(apiKey, apiSecret, { timeout: STREAM_TIMEOUT_MS });
   return feeds;
 }
 

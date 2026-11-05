@@ -11,6 +11,7 @@
  * The surface is exactly what the mobile (SparklerMobile) and web (sparkler_web)
  * clients call, plus the admin-only mails and sparkler ops routes.
  */
+import { findUniqueUsername } from "../../src/services/users.js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Application } from "express";
 import request from "supertest";
@@ -646,5 +647,25 @@ describe("account emails", () => {
     await vi.waitFor(() => expect(mailsTo(user.email)).toHaveLength(1));
     expect(mailsTo(user.email)[0]?.subject).toBe("Your Sparkler account has been deleted");
     expect(mailsTo(user.email)[0]?.text).toContain("last email");
+  });
+});
+
+describe("reserved usernames", () => {
+  it("refuses a name a page already lives at, whatever its case", async () => {
+    const { token } = await createUser({ username: "before-reserved" });
+    const res = await api()
+      .patch("/api/sparklers")
+      .set("x-auth-token", token)
+      .send({ custom: { username: "About" } });
+    expect(res.status).toBe(409);
+  });
+
+  it("never generates one at sign-up", async () => {
+    const username = await findUniqueUsername("Ab out");
+    expect(username).toMatch(/^about\d{3}$/);
+  });
+
+  it("gives a blank name a username rather than none", async () => {
+    expect(await findUniqueUsername("  ")).toMatch(/^sparkler/);
   });
 });

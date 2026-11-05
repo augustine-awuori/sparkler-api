@@ -24,6 +24,7 @@ import {
 } from "../services/accountMail.js";
 import { issueAuthToken } from "../services/authToken.js";
 import { verifyFirebaseIdToken } from "../services/firebaseIdentity.js";
+import { isReservedUsername } from "../domain/reservedUsernames.js";
 import { streamClient } from "../services/stream.js";
 import {
   findSparklerById,
@@ -272,6 +273,9 @@ async function updateOwnProfile(req: AuthedRequest<Params, ProfileBody>, res: Re
 
   if (!Object.keys($set).length)
     return res.status(400).send({ error: "No updatable fields provided" });
+
+  if (username && isReservedUsername(username))
+    throw new ConflictError("That username isn't available");
 
   if (username && (await isUsernameTaken(username, req.user.id)))
     throw new ConflictError("That username is already taken");
