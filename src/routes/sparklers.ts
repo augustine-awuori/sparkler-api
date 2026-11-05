@@ -13,6 +13,7 @@ import { authedHandler, handler, type AuthedRequest } from "../http/handler.js";
 import { auth } from "../http/middlewares/authenticate.js";
 import { requireAdmin } from "../http/middlewares/requireAdmin.js";
 import { legacyText, withAuthToken } from "../http/respond.js";
+import { PushPreference } from "../models/pushPreference.js";
 import { PushToken } from "../models/pushToken.js";
 import { Sparkler } from "../models/sparkler.js";
 import {
@@ -301,6 +302,7 @@ router.delete(
     if (!user) throw new NotFoundError("User does not exist in the database");
 
     await PushToken.deleteMany({ userId: user._id });
+    await PushPreference.deleteMany({ userId: user._id });
     sendInBackground(req.log, [accountDeletedMail(user)]);
 
     try {

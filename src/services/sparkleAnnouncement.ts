@@ -84,7 +84,7 @@ async function claimAnnouncement(
 }
 
 async function deliver(senderId: string, { recipients, push }: AnnouncementPlan): Promise<void> {
-  const reachable = await reachableRecipients(senderId, await recipients());
+  const reachable = await reachableRecipients(senderId, await recipients(), "sparkles");
   const tokens = await pushTokensOf(reachable);
   await sendPushNotificationTo(tokens, push);
 }

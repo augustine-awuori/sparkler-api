@@ -1,5 +1,6 @@
 import { isValidObjectId } from "mongoose";
 
+import { PushPreference, type PushCategory } from "../models/pushPreference.js";
 import { PushToken } from "../models/pushToken.js";
 import { logger } from "../utils/logger.js";
 import { streamClient } from "./stream.js";
@@ -12,11 +13,13 @@ const BLOCK_LOOKUP_BATCH = 100;
  * On the server because a sender's app can't know who has blocked or muted them.
  * Both live on Stream: blocks work both ways there, and mutes are Stream Chat's
  * `muteUser`. If Stream can't answer this sends to nobody: a missed notification
- * is better than one from someone a person blocked.
+ * is better than one from someone a person blocked. `category` also drops anyone
+ * who turned that kind of notification off.
  */
 export async function reachableRecipients(
   senderId: string,
   recipientIds: readonly unknown[],
+  category?: PushCategory,
 ): Promise<string[]> {
   const candidates = [...new Set(recipientIds)].filter(
     (id): id is string => typeof id === "string" && isValidObjectId(id) && id !== senderId,
@@ -25,6 +28,15 @@ export async function reachableRecipients(
 
   try {
     const silenced = new Set<string>();
+
+    if (category) {
+      const optedOut = await PushPreference.find(
+        { userId: { $in: candidates }, off: category },
+        { userId: 1 },
+      ).lean();
+      for (const row of optedOut) silenced.add(row.userId.toString());
+    }
+
     const { blocks } = await streamClient().getBlockedUsers({ user_id: senderId });
     for (const block of blocks) silenced.add(block.blocked_user_id);
 

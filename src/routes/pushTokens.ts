@@ -4,6 +4,7 @@ import { BadRequestError } from "../domain/errors.js";
 import { authedHandler } from "../http/handler.js";
 import { auth } from "../http/middlewares/authenticate.js";
 import { requireAdmin } from "../http/middlewares/requireAdmin.js";
+import { PUSH_CATEGORIES, PushPreference, type PushCategory } from "../models/pushPreference.js";
 import { PushToken } from "../models/pushToken.js";
 import { pushTokensOf, reachableRecipients } from "../services/pushAudience.js";
 import { announceSparkle } from "../services/sparkleAnnouncement.js";
@@ -26,6 +27,29 @@ function payloadOf({ message = "", title, data }: NotificationBody) {
     ...(typeof title === "string" && { title }),
     ...(data !== null && typeof data === "object" && { data }),
   };
+}
+
+/** Which setting governs a push, from the `kind` both apps put in its data. */
+const CATEGORY_OF_KIND: Record<string, PushCategory> = {
+  comment: "replies",
+  reply: "replies",
+  like: "likes",
+  resparkle: "likes",
+  quote: "mentions",
+  mention: "mentions",
+  follow: "follows",
+  message: "messages",
+  sparkle: "sparkles",
+};
+
+function categoryOf(data: unknown): PushCategory | undefined {
+  const { kind, type } = (data ?? {}) as { kind?: unknown; type?: unknown };
+  const key = kind ?? type;
+  return typeof key === "string" ? CATEGORY_OF_KIND[key] : undefined;
+}
+
+function isPushCategory(value: unknown): value is PushCategory {
+  return (PUSH_CATEGORIES as readonly unknown[]).includes(value);
 }
 
 function requiredPushToken(value: unknown): string {
@@ -63,6 +87,32 @@ router.delete(
   }),
 );
 
+router.get(
+  "/preferences",
+  auth,
+  authedHandler(async (req, res) => {
+    const row = await PushPreference.findOne({ userId: req.user.id }, { off: 1 }).lean();
+    res.send({ off: row?.off ?? [] });
+  }),
+);
+
+router.put(
+  "/preferences",
+  auth,
+  authedHandler<Record<string, string>, { off?: unknown }>(async (req, res) => {
+    const { off } = req.body;
+    if (!Array.isArray(off) || !off.every(isPushCategory)) {
+      throw new BadRequestError("Unknown notification setting");
+    }
+    await PushPreference.updateOne(
+      { userId: req.user.id },
+      { userId: req.user.id, off: [...new Set(off)] },
+      { upsert: true },
+    );
+    res.send({ success: true });
+  }),
+);
+
 router.post(
   "/sparkle",
   auth,
@@ -86,7 +136,11 @@ router.post(
       if (userIds.length > MAX_RECIPIENTS_PER_REQUEST)
         return res.status(400).json({ error: "Too many recipients" });
 
-      const recipients = await reachableRecipients(req.user.id, userIds);
+      const recipients = await reachableRecipients(
+        req.user.id,
+        userIds,
+        categoryOf(req.body.data),
+      );
       await sendPushNotificationTo(await pushTokensOf(recipients), payloadOf(req.body));
       res.send({ success: true });
     },

@@ -8,6 +8,7 @@ import { createApp } from "../../src/app.js";
 import { connectDb, disconnectDb } from "../../src/config/db.js";
 import { loadConfig } from "../../src/config/index.js";
 import { PushAnnouncement } from "../../src/models/pushAnnouncement.js";
+import { PushPreference } from "../../src/models/pushPreference.js";
 import { PushToken } from "../../src/models/pushToken.js";
 import { MAX_ANONYMOUS_PER_HOUR } from "../../src/services/sparkleAnnouncement.js";
 
@@ -91,6 +92,7 @@ beforeEach(async () => {
   stream.feeds.queryFollows.mockResolvedValue({ follows: [] });
   await Promise.all([
     PushToken.deleteMany({}),
+    PushPreference.deleteMany({}),
     PushAnnouncement.deleteMany({}),
   ]);
 });
@@ -342,5 +344,64 @@ describe("device registration", () => {
       .send({ pushToken: deviceOf(owner) });
     expect(res.status).toBe(200);
     expect(await PushToken.countDocuments({ userId: owner })).toBe(0);
+  });
+});
+
+describe("notification settings", () => {
+  const preferences = (id: string) =>
+    request(app).get("/api/pushTokens/preferences").set("x-auth-token", tokenFor(id));
+  const save = (id: string, off: unknown) =>
+    request(app)
+      .put("/api/pushTokens/preferences")
+      .set("x-auth-token", tokenFor(id))
+      .send({ off });
+
+  it("starts with everything on, then remembers what's turned off", async () => {
+    const id = newId();
+    expect((await preferences(id)).body.off).toEqual([]);
+
+    await save(id, ["likes", "likes", "sparkles"]);
+
+    expect((await preferences(id)).body.off).toEqual(["likes", "sparkles"]);
+  });
+
+  it("refuses a setting that doesn't exist", async () => {
+    expect((await save(newId(), ["nonsense"])).status).toBe(400);
+    expect((await save(newId(), { $ne: null })).status).toBe(400);
+  });
+
+  it("needs a signed-in account", async () => {
+    expect((await request(app).get("/api/pushTokens/preferences")).status).toBe(401);
+  });
+
+  it("skips someone who turned that kind of push off, and only that kind", async () => {
+    const [noLikes, normal] = [await withDevice(), await withDevice()];
+    await save(noLikes, ["likes"]);
+    const send_ = (kind: string) =>
+      request(app)
+        .post("/api/pushTokens/send-to-many")
+        .set("x-auth-token", tokenFor(newId()))
+        .send({ userIds: [noLikes, normal], message: "Hi", data: { kind, type: kind } });
+
+    await send_("resparkle");
+    expect(lastSend()[0]).toEqual([deviceOf(normal)]);
+
+    await send_("quote");
+    expect(lastSend()[0].sort()).toEqual([deviceOf(noLikes), deviceOf(normal)].sort());
+  });
+
+  it("leaves new sparkles out for someone who turned them off", async () => {
+    const author = newId();
+    const [noSparkles, normal] = [await withDevice(), await withDevice()];
+    await save(noSparkles, ["sparkles"]);
+    stream.feeds.getActivity.mockResolvedValue({ activity: activity(author) });
+    stream.feeds.queryFollows.mockResolvedValue({
+      follows: [followFrom(noSparkles), followFrom(normal)],
+    });
+
+    await announce(author);
+
+    await sent();
+    expect(lastSend()[0]).toEqual([deviceOf(normal)]);
   });
 });
