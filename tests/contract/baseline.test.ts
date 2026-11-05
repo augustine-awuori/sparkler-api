@@ -20,13 +20,14 @@ import mongoose from "mongoose";
 import { createApp } from "../../src/app.js";
 import { connectDb, disconnectDb } from "../../src/config/db.js";
 import { loadConfig } from "../../src/config/index.js";
+import type { FirebaseIdentity } from "../../src/services/firebaseIdentity.js";
 
 // Resend is replaced so no email leaves the machine; every email the API would
 // send lands in `outbox` instead.
 type SentMail = { to: string; subject: string; text: string };
 const outbox = vi.hoisted(() => [] as SentMail[]);
 const verifyFirebaseIdTokenMock = vi.hoisted(() =>
-  vi.fn(async (token: string) => ({
+  vi.fn(async (token: string): Promise<FirebaseIdentity> => ({
     id: `firebase-${token.slice("test:".length)}`,
     email: token.slice("test:".length),
   })),
@@ -306,6 +307,11 @@ describe("first sign-in (email not in the database)", () => {
   it("uses the verified Firebase email instead of a caller-supplied email", async () => {
     const verifiedEmail = unique("verified");
     const claimedEmail = unique("claimed");
+    const claimedAccount = await Sparkler().create({
+      email: claimedEmail,
+      name: "Claimed Account",
+      custom: { username: "claimed-account" },
+    });
     const res = await quick({
       idToken: firebaseIdTokenFor(verifiedEmail),
       email: claimedEmail,
@@ -314,7 +320,52 @@ describe("first sign-in (email not in the database)", () => {
 
     expect(res.status).toBe(200);
     expect(await Sparkler().countDocuments({ email: verifiedEmail })).toBe(1);
-    expect(await Sparkler().countDocuments({ email: claimedEmail })).toBe(0);
+    expect(claimsOf(res.text).id).not.toBe(String(claimedAccount._id));
+    expect(await Sparkler().countDocuments({ email: claimedEmail })).toBe(1);
+  });
+
+  it("creates a new account from the verified identity profile when profile fields are omitted", async () => {
+    const email = unique("Firebase.Profile").replace("@", "@Example.");
+    verifyFirebaseIdTokenMock.mockResolvedValueOnce({
+      id: "firebase-profile-user",
+      email,
+      name: "Firebase Profile",
+      image: "https://example.com/firebase-profile.jpg",
+    });
+
+    const res = await quick({ idToken: firebaseIdTokenFor(email) });
+
+    expect(res.status).toBe(200);
+    const claims = claimsOf(res.text);
+    expect(claims.name).toBe("Firebase Profile");
+    const stored = await Sparkler()
+      .findById(claims.id)
+      .lean<StoredUser & { email: string; image: string }>();
+    expect(stored?.email).toBe(email);
+    expect(stored?.name).toBe("Firebase Profile");
+    expect(stored?.image).toBe("https://example.com/firebase-profile.jpg");
+  });
+
+  it("authenticates an existing email match without using request profile fields", async () => {
+    const email = unique("existing").replace("@", "@Example.");
+    const existing = await Sparkler().create({
+      email,
+      name: "Stored Name",
+      image: "https://example.com/stored.jpg",
+      custom: { username: "stored-name" },
+    });
+    const res = await quick({
+      idToken: firebaseIdTokenFor(email.toLowerCase()),
+      name: 42,
+      image: "https://example.com/attacker.jpg",
+    });
+
+    expect(res.status).toBe(200);
+    expect(claimsOf(res.text).id).toBe(String(existing._id));
+    expect(claimsOf(res.text).name).toBe("Stored Name");
+    const stored = await Sparkler().findById(existing._id).lean<StoredUser & { image: string }>();
+    expect(stored?.name).toBe("Stored Name");
+    expect(stored?.image).toBe("https://example.com/stored.jpg");
   });
 
   it("never uses a request-body email object as a Mongo query", async () => {
@@ -413,6 +464,52 @@ describe("profile updates", () => {
     const refreshedClaims = jwt.decode(res.text) as { name: string; custom: { username: string } };
     expect(refreshedClaims.name).toBe("After");
     expect(refreshedClaims.custom.username).toBe("after-name");
+  });
+
+  it("PATCH persists and returns a named location with validated coordinates", async () => {
+    const { id, token } = await createUser({ username: "location-user" });
+    const location = {
+      name: "University of Nairobi, Nairobi, Kenya",
+      coords: { lat: -1.2864, lng: 36.8172 },
+      precision: "precise",
+    };
+
+    const saved = await api()
+      .patch("/api/sparklers")
+      .set("x-auth-token", token)
+      .send({ custom: { location } });
+
+    expect(saved.status).toBe(200);
+    const stored = await Sparkler().findById(id).lean<StoredUser>();
+    expect(stored?.custom.location).toEqual(location);
+
+    const reloaded = await api().get(`/api/sparklers/${id}`);
+    expect(reloaded.status).toBe(200);
+    expect(reloaded.body.custom.location).toEqual(location);
+  });
+
+  it("rejects out-of-range profile coordinates without saving them", async () => {
+    const { id, token } = await createUser({ username: "invalid-location" });
+    const res = await api()
+      .patch("/api/sparklers")
+      .set("x-auth-token", token)
+      .send({
+        custom: { location: { name: "Nairobi", coords: { lat: 91, lng: 36 } } },
+      });
+
+    expect(res.status).toBe(400);
+    const stored = await Sparkler().findById(id).lean<StoredUser>();
+    expect(stored?.custom.location).toBeUndefined();
+  });
+
+  it("rejects a profile location name that exceeds the mobile field limit", async () => {
+    const { token } = await createUser({ username: "long-location" });
+    const res = await api()
+      .patch("/api/sparklers")
+      .set("x-auth-token", token)
+      .send({ custom: { location: { name: "x".repeat(81) } } });
+
+    expect(res.status).toBe(400);
   });
 
   it("PATCH with another user's username -> 409; re-sending your own is fine", async () => {

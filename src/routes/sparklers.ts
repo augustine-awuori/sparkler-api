@@ -1,6 +1,13 @@
 import { Router, type Response } from "express";
 
-import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from "../domain/errors.js";
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../domain/errors.js";
+import { parseProfileLocation } from "../domain/user.types.js";
 import type { StreamSourceDoc } from "../domain/stream.types.js";
 import { authedHandler, handler, type AuthedRequest } from "../http/handler.js";
 import { auth } from "../http/middlewares/authenticate.js";
@@ -72,22 +79,24 @@ function errorText(error: unknown): string {
 const isDuplicateKey = (error: unknown): boolean =>
   (error as { code?: unknown } | null)?.code === 11000;
 
-/**
- * The Sparkler for `email`, created if there is none. `created` is true only
- * for the request that actually inserted it: when two first sign-ins race, the
- * loser hits the unique email index and signs into the winner's account.
- */
-async function findOrCreateSparkler(email: string, name: string, image: string) {
-  const existing = await Sparkler.findOne({ email });
-  if (existing) return { sparkler: existing, created: false };
+function findSparklerByEmail(email: string) {
+  const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return Sparkler.findOne({ email: new RegExp(`^${escapedEmail}$`, "i") });
+}
 
+/**
+ * Creates the Sparkler after the caller has checked for an existing account.
+ * If first sign-ins race, the request that loses the unique-email insert signs
+ * into the account created by the winner.
+ */
+async function createSparkler(email: string, name: string, image: string) {
   const username = await findUniqueUsername(name);
   try {
     const sparkler = await new Sparkler({ email, name, image, custom: { username } }).save();
     return { sparkler, created: true };
   } catch (error) {
     if (!isDuplicateKey(error)) throw error;
-    const winner = await Sparkler.findOne({ email });
+    const winner = await findSparklerByEmail(email);
     if (!winner) throw error;
     return { sparkler: winner, created: false };
   }
@@ -103,14 +112,21 @@ router.post(
     }
 
     const identity = await verifyFirebaseIdToken(req.body.idToken);
-    const suppliedName = trimmedString(req.body?.name);
-    if (req.body?.name !== undefined && !suppliedName) {
-      return res.status(400).send({ error: "Name must be a non-empty string" });
+    const email = identity.email.trim();
+    let sparkler = await findSparklerByEmail(email);
+    let created = false;
+
+    if (!sparkler) {
+      const suppliedName = trimmedString(req.body?.name);
+      if (req.body?.name !== undefined && !suppliedName) 
+        return res.status(400).send({ error: "Name must be a non-empty string" });
+      
+      const name = suppliedName || identity.name || email;
+      const image =
+        typeof req.body?.image === "string" ? req.body.image.trim() : identity.image || "";
+      ({ sparkler, created } = await createSparkler(email, name, image));
     }
-    const name = suppliedName || identity.name || identity.email;
-    const image =
-      typeof req.body?.image === "string" ? req.body.image.trim() : identity.image || "";
-    const { sparkler, created } = await findOrCreateSparkler(identity.email, name, image);
+
     if (created) sendInBackground(req.log, [welcomeMail(sparkler)]);
 
     await syncToStream(req.log, sparkler);
@@ -230,13 +246,20 @@ router.patch(
 
 /**
  * Updates the caller's own profile. Only `name`, `image`, `custom.username` and
- * the PROFILE_STRING_FIELDS / isProfilePrivate keys are written, each as a
- * dotted path so sibling `custom` keys survive. Everything else in the body is
- * ignored — mobile sends back its whole stored `custom`, and forwarding it
- * would let anyone set `isAdmin` or `verified` on themselves.
+ * the whitelisted profile keys are written, each as a dotted path so sibling
+ * `custom` keys survive. Everything else in the body is ignored — mobile sends
+ * back its whole stored `custom`, and forwarding it would let anyone set
+ * `isAdmin` or `verified` on themselves.
  */
 async function updateOwnProfile(req: AuthedRequest<Params, ProfileBody>, res: Response) {
   const { name, image, custom } = req.body ?? {};
+  if (
+    custom &&
+    Object.prototype.hasOwnProperty.call(custom, "location") &&
+    parseProfileLocation(custom.location) === undefined
+  ) {
+    throw new BadRequestError("Profile location must have a valid name and optional coordinates");
+  }
   const username = typeof custom?.username === "string" ? custom.username.trim() : undefined;
 
   const $set: Record<string, unknown> = {

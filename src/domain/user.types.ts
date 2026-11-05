@@ -20,7 +20,60 @@ export const PROFILE_STRING_FIELDS = [
 
 export type ProfileStringField = (typeof PROFILE_STRING_FIELDS)[number];
 
+export interface ProfileLocation {
+  name: string;
+  coords?: { lat: number; lng: number };
+  precision?: "precise" | "nearest";
+}
+
+export function parseProfileLocation(value: unknown): ProfileLocation | "" | undefined {
+  if (typeof value === "string") {
+    const name = value.trim();
+    return name ? (name.length <= 80 ? { name } : undefined) : "";
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+  const location = value as Record<string, unknown>;
+  const name = typeof location.name === "string" ? location.name.trim() : "";
+  if (!name || name.length > 80) return undefined;
+
+  const precision = location.precision;
+  if (precision !== undefined && precision !== "precise" && precision !== "nearest") {
+    return undefined;
+  }
+
+  if (location.coords === undefined) return { name };
+  if (
+    !location.coords ||
+    typeof location.coords !== "object" ||
+    Array.isArray(location.coords)
+  ) {
+    return undefined;
+  }
+
+  const { lat, lng } = location.coords as Record<string, unknown>;
+  if (
+    typeof lat !== "number" ||
+    !Number.isFinite(lat) ||
+    lat < -90 ||
+    lat > 90 ||
+    typeof lng !== "number" ||
+    !Number.isFinite(lng) ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return undefined;
+  }
+
+  return {
+    name,
+    coords: { lat, lng },
+    ...(precision ? { precision } : {}),
+  };
+}
+
 export type SparklerProfile = { [K in ProfileStringField]?: string } & {
+  location?: ProfileLocation | "";
   isProfilePrivate?: boolean;
 };
 

@@ -1,7 +1,11 @@
 import { isValidObjectId } from "mongoose";
 
 import type { DirectoryUser, StreamSourceDoc, StreamUser } from "../domain/stream.types.js";
-import { PROFILE_STRING_FIELDS, type SparklerProfile } from "../domain/user.types.js";
+import {
+  PROFILE_STRING_FIELDS,
+  parseProfileLocation,
+  type SparklerProfile,
+} from "../domain/user.types.js";
 import { Sparkler, type SparklerDoc } from "../models/sparkler.js";
 
 function generateUsername(name: string): string {
@@ -34,6 +38,7 @@ export async function findUniqueUsername(name: string): Promise<string> {
 // Never put a credential (feedToken, chatToken, authCode) in this list.
 export function toStreamUser(doc: StreamSourceDoc): StreamUser {
   const { email, verified, isAdmin, username, invalid } = doc.custom ?? {};
+  const { location } = pickProfile(doc.custom as Record<string, unknown> | null | undefined);
 
   return {
     id: doc._id.toString(),
@@ -46,6 +51,7 @@ export function toStreamUser(doc: StreamSourceDoc): StreamUser {
       isAdmin: isAdmin ?? false,
       username: username ?? "",
       invalid: invalid ?? false,
+      ...(location !== undefined ? { location } : {}),
     },
   };
 }
@@ -59,6 +65,8 @@ export function pickProfile(source: Record<string, unknown> | null | undefined):
     const value = source[key];
     if (typeof value === "string") profile[key] = value;
   }
+  const location = parseProfileLocation(source.location);
+  if (location !== undefined) profile.location = location;
   if (typeof source.isProfilePrivate === "boolean")
     profile.isProfilePrivate = source.isProfilePrivate;
 

@@ -1,4 +1,4 @@
-import type { SparklerCustom, SparklerProfile } from "./user.types.js";
+import type { ProfileLocation, SparklerCustom, SparklerProfile } from "./user.types.js";
 
 /**
  * Keys that must NEVER reach Stream.
@@ -33,6 +33,7 @@ export type StreamUserCustom = {
   isAdmin: boolean;
   username: string;
   invalid: boolean;
+  location?: ProfileLocation | string;
 } & { [K in ForbiddenOnStream]?: never };
 
 export interface StreamUser {

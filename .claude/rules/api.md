@@ -18,6 +18,7 @@ paths:
 - Quick sign-in must verify the Firebase ID token with Identity Toolkit and use only the verified, verified-email identity for account lookup. Never trust the request body's `email`. Invalid credentials are 401; verification-service outages remain upstream failures. Do not create or sign in to an account unless verification succeeds.
 - `FIREBASE_API_KEY` must match the clients' Firebase project, be configured in each server environment, and be restricted to Identity Toolkit in Google Cloud.
 - Profile updates must whitelist writable fields; never accept `custom` or permission flags from the request. Since `custom` is an unschematized Mongo object, update individual keys with dotted paths such as `"custom.username"`.
+- Profile location is a whitelisted `{ name, coords?, precision? }` value. Validate coordinate ranges, return it from the public directory, and keep legacy string locations readable.
 - Quick sign-in and profile `PATCH` return the app JWT as a bare `text/html` body and in `x-auth-token`; use `legacyText` and `withAuthToken`, not `res.json`. Preserve token refresh behavior and the contract tests when changing token issuance or response format.
 - The app JWT currently has no expiry; clients reuse it across launches. Do not introduce an expiry until clients can re-authenticate when it lapses.
 - `POST /api/pushTokens/send-to-all` currently allows any signed-in user to push to every device. Account for this existing authorization behavior when changing the endpoint.
