@@ -25,6 +25,7 @@ import {
 import { issueAuthToken } from "../services/authToken.js";
 import { verifyFirebaseIdToken } from "../services/firebaseIdentity.js";
 import { isReservedUsername } from "../domain/reservedUsernames.js";
+import { claimOwnUserFeed } from "../services/feedOwnership.js";
 import { streamClient } from "../services/stream.js";
 import {
   findSparklerById,
@@ -295,6 +296,21 @@ async function updateOwnProfile(req: AuthedRequest<Params, ProfileBody>, res: Re
 }
 
 router.patch("/", auth, authedHandler<Params, ProfileBody>(updateOwnProfile));
+
+// Takes no id: the only feed a caller can claim is their own.
+router.post(
+  "/claim-feed",
+  auth,
+  authedHandler(async (req, res) => {
+    try {
+      await claimOwnUserFeed(req.user.id);
+      res.send({ claimed: true });
+    } catch (err) {
+      req.log.error({ err, userId: req.user.id }, "Could not claim user feed");
+      res.send({ claimed: false });
+    }
+  }),
+);
 
 // Deletes the caller's own account: the Sparkler, their push tokens, and their
 // Stream user. Stream is best-effort — Mongo is the source of truth.
