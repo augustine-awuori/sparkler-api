@@ -14,3 +14,4 @@ paths:
 - `feedToken` is minted per issue and may appear only as a claim in its owner's app JWT. Never persist it to Mongo, write it to Stream, or expose it as a standalone response field. Use `toDirectoryUser()` for unauthenticated directory responses; never return a raw Sparkler document.
 - `issueAuthToken()` is the single JWT builder and must whitelist claims. Both clients use the token for Stream Feeds and Chat.
 - Feed tokens are permanent because clients cache their JWT and do not check `exp`. Do not make them expire until clients re-authenticate on expiry. Use `scripts/revoke-stream-tokens.ts` to revoke existing tokens.
+- A follower's id is `follow.source_feed.id`, because `timeline:<id>` follows `user:<id>`. `blocked_user_ids` from `queryUsers` holds who that user blocked; checked against `getBlockedUsers` on the real app.

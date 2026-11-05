@@ -21,4 +21,6 @@ paths:
 - Profile location is a whitelisted `{ name, coords?, precision? }` value. Validate coordinate ranges, return it from the public directory, and keep legacy string locations readable.
 - Quick sign-in and profile `PATCH` return the app JWT as a bare `text/html` body and in `x-auth-token`; use `legacyText` and `withAuthToken`, not `res.json`. Preserve token refresh behavior and the contract tests when changing token issuance or response format.
 - The app JWT currently has no expiry; clients reuse it across launches. Do not introduce an expiry until clients can re-authenticate when it lapses.
-- `POST /api/pushTokens/send-to-all` currently allows any signed-in user to push to every device. Account for this existing authorization behavior when changing the endpoint.
+- `POST /api/pushTokens/send-to-all` is admin-only. Stream sends most pushes itself (`scripts/configure-stream-push.ts`), so check Stream before adding a push route. Clients announce a sparkle through `POST /api/pushTokens/sparkle`, which reads the text and audience from Stream, not the request.
+- Every push passes `reachableRecipients` (`src/services/pushAudience.ts`), which drops anyone blocked either way or muting the sender (Stream Chat `muteUser`), and sends to nobody if Stream can't answer. Do not add a send path that skips it.
+- `PushToken` has one row per device: unique on `pushToken`, not on `userId`. `scripts/migrate-push-tokens.ts` moves an existing database over.

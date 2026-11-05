@@ -5,6 +5,11 @@ export interface IPushToken {
   pushToken: string;
 }
 
+/**
+ * One row per device. Unique on the token, not the account: an account can be on
+ * several phones, but a phone belongs to whoever signed in on it last, so the
+ * previous account's notifications stop arriving there.
+ */
 export const PushToken = model<IPushToken>(
   "PushToken",
   new Schema<IPushToken>({
@@ -12,8 +17,8 @@ export const PushToken = model<IPushToken>(
       type: Schema.Types.ObjectId,
       ref: "Sparkler",
       required: true,
-      unique: true,
+      index: true,
     },
-    pushToken: { type: String, required: true },
+    pushToken: { type: String, required: true, unique: true },
   }),
 );
