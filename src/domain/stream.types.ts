@@ -54,6 +54,8 @@ export interface DirectoryUser {
   /** ISO date. Absent on documents written before `timestamp` existed. */
   createdAt?: string;
   points: number;
+  /** Beside `custom`, so a profile edit can't write it. The address itself is never listed. */
+  studentVerified: boolean;
   custom: { username: string; verified: boolean; isAdmin: boolean } & SparklerProfile & {
       [K in ForbiddenOnStream]?: never;
     };
@@ -71,5 +73,6 @@ export interface StreamSourceDoc {
   image?: string | null;
   timestamp?: number | null;
   points?: number | null;
+  studentVerifiedAt?: Date | null;
   custom?: SparklerCustom | null;
 }

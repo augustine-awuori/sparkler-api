@@ -29,6 +29,7 @@ import { verifyFirebaseIdToken } from "../services/firebaseIdentity.js";
 import { isReservedUsername } from "../domain/reservedUsernames.js";
 import { claimOwnUserFeed } from "../services/feedOwnership.js";
 import { streamClient } from "../services/stream.js";
+import { forgetStudentCode } from "../services/studentVerification.js";
 import {
   findSparklerById,
   findUniqueUsername,
@@ -333,6 +334,7 @@ router.delete(
     await PushPreference.deleteMany({ userId: user._id });
     await scrubIssueReporter(user._id.toString());
     await PointEvent.deleteMany({ userId: user._id.toString() });
+    await forgetStudentCode(user._id.toString());
     sendInBackground(req.log, [accountDeletedMail(user)]);
 
     try {

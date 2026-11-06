@@ -20,6 +20,12 @@ export interface ISparkler {
    * writes and what Stream echoes. Only `claimPoints` changes this.
    */
   points: number;
+  /**
+   * The university address that proved this account, kept off the directory: only
+   * `studentVerifiedAt` becomes public, as a badge. Only `confirmStudentCode` sets these.
+   */
+  studentEmail?: string;
+  studentVerifiedAt?: Date;
 }
 
 /** JWTs are issued by issueAuthToken in services/authToken.ts, not a model method. */
@@ -45,6 +51,8 @@ const schema = new Schema<ISparkler>({
   name: String,
   image: String,
   points: { type: Number, default: 0 },
+  studentEmail: { type: String, unique: true, sparse: true },
+  studentVerifiedAt: Date,
   timestamp: {
     type: Number,
     default: objectIdTimestamp,

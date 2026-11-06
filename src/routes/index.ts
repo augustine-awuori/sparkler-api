@@ -7,6 +7,7 @@ import points from "./points.js";
 import pushTokens from "./pushTokens.js";
 import schools from "./schools.js";
 import sparklers from "./sparklers.js";
+import studentVerification from "./studentVerification.js";
 
 /**
  * Mounting only — app wiring lives in app.ts. This is exactly the surface the
@@ -20,4 +21,5 @@ export function mountRoutes(app: Application): void {
   app.use("/api/pushTokens", pushTokens);
   app.use("/api/schools", schools);
   app.use("/api/sparklers", sparklers);
+  app.use("/api/studentVerification", studentVerification);
 }
