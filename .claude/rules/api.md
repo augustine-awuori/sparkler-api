@@ -19,6 +19,7 @@ paths:
 - `FIREBASE_API_KEY` must match the clients' Firebase project, be configured in each server environment, and be restricted to Identity Toolkit in Google Cloud.
 - Profile updates must whitelist writable fields; never accept `custom` or permission flags from the request. Since `custom` is an unschematized Mongo object, update individual keys with dotted paths such as `"custom.username"`.
 - `custom.studentStatus` (`student` or `alumni`) and `custom.graduationYear` (a four-digit string, optional) are separate from `custom.year`, which installed clients parse as a number and would erase if it held anything else. Both are validated in the route, since `pickProfile` keeps any string.
+- `GET /api/places/search?q=` proxies place search behind `PlaceSearchProvider` (Photon today, no key), so swapping providers needs no client release. A provider outage is a 200 with `available: false`, since the clients still accept a typed place.
 - Profile location is a whitelisted `{ name, coords?, precision? }` value. Validate coordinate ranges, return it from the public directory, and keep legacy string locations readable.
 - Quick sign-in and profile `PATCH` return the app JWT as a bare `text/html` body and in `x-auth-token`; use `legacyText` and `withAuthToken`, not `res.json`. Preserve token refresh behavior and the contract tests when changing token issuance or response format.
 - The app JWT currently has no expiry; clients reuse it across launches. Do not introduce an expiry until clients can re-authenticate when it lapses.

@@ -1,6 +1,7 @@
 import type { Application } from "express";
 
 import mails from "./mails.js";
+import places from "./places.js";
 import pushTokens from "./pushTokens.js";
 import schools from "./schools.js";
 import sparklers from "./sparklers.js";
@@ -11,6 +12,7 @@ import sparklers from "./sparklers.js";
  */
 export function mountRoutes(app: Application): void {
   app.use("/api/mails", mails);
+  app.use("/api/places", places);
   app.use("/api/pushTokens", pushTokens);
   app.use("/api/schools", schools);
   app.use("/api/sparklers", sparklers);
