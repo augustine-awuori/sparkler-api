@@ -146,7 +146,6 @@ describe("removed routers", () => {
   it.each([
     "/api/chatToken",
     "/api/grao",
-    "/api/issues",
     "/api/feedback",
     "/api/sparklers/auth-code",
     "/api/sparklers/auth-google",

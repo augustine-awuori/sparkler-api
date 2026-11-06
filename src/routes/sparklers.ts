@@ -23,6 +23,7 @@ import {
   welcomeMail,
 } from "../services/accountMail.js";
 import { issueAuthToken } from "../services/authToken.js";
+import { scrubIssueReporter } from "../services/issues.js";
 import { verifyFirebaseIdToken } from "../services/firebaseIdentity.js";
 import { isReservedUsername } from "../domain/reservedUsernames.js";
 import { claimOwnUserFeed } from "../services/feedOwnership.js";
@@ -329,6 +330,7 @@ router.delete(
 
     await PushToken.deleteMany({ userId: user._id });
     await PushPreference.deleteMany({ userId: user._id });
+    await scrubIssueReporter(user._id.toString());
     sendInBackground(req.log, [accountDeletedMail(user)]);
 
     try {

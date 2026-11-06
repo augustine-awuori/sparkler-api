@@ -11,6 +11,7 @@ export type ErrorCode =
   | "not_found"
   | "conflict"
   | "payload_too_large"
+  | "rate_limited"
   | "upstream_failure"
   | "internal_error";
 
@@ -77,6 +78,12 @@ export class ConflictError extends AppError {
   }
 }
 
+export class TooManyRequestsError extends AppError {
+  constructor(message = "Too many requests") {
+    super({ status: 429, code: "rate_limited", message });
+  }
+}
+
 /** A third party (Stream, Resend, Poe) failed. Never exposes their message. */
 export class UpstreamError extends AppError {
   constructor(message = "Upstream service unavailable", cause?: unknown) {
@@ -103,6 +110,7 @@ export const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   not_found: "Not found",
   conflict: "Already exists",
   payload_too_large: "Payload too large",
+  rate_limited: "Too many requests",
   upstream_failure: "Upstream service unavailable",
   internal_error: "Something failed",
 };
