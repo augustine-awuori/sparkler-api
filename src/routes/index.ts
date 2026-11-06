@@ -1,6 +1,7 @@
 import type { Application } from "express";
 
 import issues from "./issues.js";
+import moderation from "./moderation.js";
 import mails from "./mails.js";
 import places from "./places.js";
 import points from "./points.js";
@@ -16,6 +17,7 @@ import studentVerification from "./studentVerification.js";
 export function mountRoutes(app: Application): void {
   app.use("/api/issues", issues);
   app.use("/api/mails", mails);
+  app.use("/api/moderation", moderation);
   app.use("/api/places", places);
   app.use("/api/points", points);
   app.use("/api/pushTokens", pushTokens);
