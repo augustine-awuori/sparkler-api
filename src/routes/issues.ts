@@ -19,10 +19,12 @@ import {
   createIssue,
   isReportLimitReached,
   issueReportedMails,
+  reporterUpdateMail,
   toReporterView,
   toStaffView,
 } from "../services/issues.js";
 import { findSparklerById } from "../services/users.js";
+import type { Logger } from "../utils/logger.js";
 
 type IdParams = { id: string };
 
@@ -32,6 +34,13 @@ async function issueOr404(id: string): Promise<IssueDoc> {
   const issue = isIssueId(id) ? await Issue.findById(id) : null;
   if (!issue) throw new NotFoundError("That issue doesn't exist");
   return issue;
+}
+
+/** Never awaited: a mail problem must not undo a change that's already saved. */
+function tellReporter(log: Logger, issue: IssueDoc, entriesSeen: number) {
+  reporterUpdateMail(issue, issue.timeline.slice(entriesSeen))
+    .then((mails) => (mails.length ? sendInBackground(log, mails) : undefined))
+    .catch((err: unknown) => log.error({ err }, "Could not mail a reporter about their issue"));
 }
 
 router.post(
@@ -112,7 +121,10 @@ router.patch(
   authedHandler<IdParams>(async (req, res) => {
     const change = issueChangeSchema.parse(req.body);
     const issue = await issueOr404(req.params.id);
-    res.send(toStaffView(await applyIssueChange(issue, req.user.id, change)));
+    const seen = issue.timeline.length;
+    const saved = await applyIssueChange(issue, req.user.id, change);
+    tellReporter(req.log, saved, seen);
+    res.send(toStaffView(saved));
   }),
 );
 
@@ -123,7 +135,10 @@ router.post(
   authedHandler<IdParams>(async (req, res) => {
     const note = issueNoteSchema.parse(req.body);
     const issue = await issueOr404(req.params.id);
-    res.status(201).send(toStaffView(await addIssueNote(issue, req.user.id, note)));
+    const seen = issue.timeline.length;
+    const saved = await addIssueNote(issue, req.user.id, note);
+    tellReporter(req.log, saved, seen);
+    res.status(201).send(toStaffView(saved));
   }),
 );
 

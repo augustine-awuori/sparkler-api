@@ -30,12 +30,27 @@ export type IssueTimelineVisibility = (typeof TIMELINE_VISIBILITIES)[number];
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const shortText = z.string().trim().max(120).optional();
 
+export const MAX_ISSUE_ATTACHMENTS = 3;
+
+/** Only our own storage, so a report can't make staff open a link of the sender's choosing. */
+const ownStorageUrl = z
+  .string()
+  .url()
+  .max(2000)
+  .refine((url) => url.startsWith("https://firebasestorage.googleapis.com/"), {
+    message: "Attachments must be uploaded to Sparkler",
+  });
+
 /** Sent by the client and never trusted for identity: `reportedBy` comes from the token. */
 export const newIssueSchema = z.object({
   type: z.enum(ISSUE_TYPES),
   title: z.string().trim().min(3).max(120),
   description: z.string().trim().min(1).max(4000),
   source: z.enum(ISSUE_SOURCES),
+  attachments: z
+    .array(z.object({ url: ownStorageUrl, kind: z.literal("image") }))
+    .max(MAX_ISSUE_ATTACHMENTS)
+    .default([]),
   context: z
     .object({
       platform: shortText,

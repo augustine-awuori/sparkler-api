@@ -266,6 +266,46 @@ describe("working on an issue", () => {
 });
 
 describe("deleting an account", () => {
+  it("tells the reporter about a reply or status change, and never an internal note", async () => {
+    const reporter = await aUser();
+    const admin = await aUser({ isAdmin: true });
+    const { body: issue } = await reporter.as("post", "/api/issues").send(REPORT);
+    const reporterDoc = await Sparkler.findById(reporter.id);
+    const mailedToReporter = () =>
+      mail.sendMailBatch.mock.calls
+        .flatMap((call) => (call as unknown as [{ to: string; message: string }[]])[0])
+        .filter((sent) => sent.to === reporterDoc?.email);
+
+    await admin.as("post", `/api/issues/${issue.id}/notes`).send({ body: "secret", visibility: "internal" });
+    await admin.as("patch", `/api/issues/${issue.id}`).send({ priority: "high", handledBy: admin.id });
+    await new Promise((settled) => setTimeout(settled, 50));
+    expect(mailedToReporter()).toHaveLength(0);
+
+    await admin.as("post", `/api/issues/${issue.id}/notes`).send({ body: "Try updating", visibility: "reporter" });
+    await vi.waitFor(() => expect(mailedToReporter()).toHaveLength(1));
+    expect(mailedToReporter()[0]?.message).toContain("Try updating");
+
+    await admin.as("patch", `/api/issues/${issue.id}`).send({ status: "resolved" });
+    await vi.waitFor(() => expect(mailedToReporter()).toHaveLength(2));
+    expect(mailedToReporter()[1]?.message).toContain("resolved");
+    expect(mailedToReporter().map((sent) => sent.message).join()).not.toContain("secret");
+  });
+
+  it("keeps screenshots on the report, and only from our own storage", async () => {
+    const reporter = await aUser();
+    const url = "https://firebasestorage.googleapis.com/v0/b/x/o/shot.jpg?alt=media";
+    const { status, body } = await reporter
+      .as("post", "/api/issues")
+      .send({ ...REPORT, attachments: [{ url, kind: "image" }] });
+    expect(status).toBe(201);
+    expect(body.attachments).toEqual([{ url, kind: "image" }]);
+
+    const elsewhere = await reporter
+      .as("post", "/api/issues")
+      .send({ ...REPORT, attachments: [{ url: "https://evil.example/x.jpg", kind: "image" }] });
+    expect(elsewhere.status).toBe(400);
+  });
+
   it("removes the reporter's name from their issues and keeps the issues", async () => {
     const reporter = await aUser();
     const { body: created } = await reporter.as("post", "/api/issues").send(REPORT);

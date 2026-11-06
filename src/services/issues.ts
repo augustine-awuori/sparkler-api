@@ -29,6 +29,7 @@ export function toReporterView(issue: IssueDoc) {
     type: issue.type,
     title: issue.title,
     description: issue.description,
+    attachments: issue.attachments.map(({ url, kind }) => ({ url, kind })),
     status: issue.status,
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt,
@@ -150,7 +151,7 @@ export async function scrubIssueReporter(userId: string): Promise<void> {
  * is the reporter's own, and the mail template escapes it.
  */
 export async function issueReportedMails(
-  issue: Pick<IIssue, "reference" | "type" | "title" | "description" | "reportedBy">,
+  issue: Pick<IIssue, "reference" | "type" | "title" | "description" | "reportedBy" | "attachments">,
 ): Promise<MailInput[]> {
   const admins = await Sparkler.find({ "custom.isAdmin": true }, { email: 1 }).lean();
   const who = issue.reportedBy.username ? `@${issue.reportedBy.username}` : issue.reportedBy.name;
@@ -159,7 +160,50 @@ export async function issueReportedMails(
     subject: `[${issue.reference}] ${issue.title}`,
     heading: `New ${issue.type} report`,
     preheader: `${who}: ${issue.title}`,
-    message: [`${issue.title}\nFrom ${who}`, issue.description].join("\n\n"),
+    message: [
+      `${issue.title}\nFrom ${who}`,
+      issue.description,
+      ...issue.attachments.map(({ url }) => `Screenshot: ${url}`),
+    ].join("\n\n"),
     cta: { label: "Open Sparkler", url: SITE },
   }));
+}
+
+const STATUS_WORDS: Record<IssueStatus, string> = {
+  open: "We've reopened it.",
+  triaged: "We're looking at it.",
+  in_progress: "We're working on it.",
+  waiting_on_user: "We need something from you. Please check the reply below or message the team.",
+  resolved: "It's resolved.",
+  closed: "We've closed it.",
+};
+
+function describeForReporter(entry: IssueTimelineEntry): string | null {
+  if (entry.visibility !== "reporter") return null;
+  if (entry.kind === "status_changed") return STATUS_WORDS[entry.to as IssueStatus] ?? null;
+  return entry.body ?? null;
+}
+
+/**
+ * Tells the reporter what changed, if anything they're allowed to see did.
+ * Takes the new timeline entries, so a note or assignment can never reach them.
+ */
+export async function reporterUpdateMail(
+  issue: IssueDoc,
+  newEntries: readonly IssueTimelineEntry[],
+): Promise<MailInput[]> {
+  const lines = newEntries.map(describeForReporter).filter((line): line is string => Boolean(line));
+  if (!lines.length) return [];
+  const reporter = await findSparklerById(issue.reportedBy.userId);
+  if (!reporter) return [];
+  return [
+    {
+      to: reporter.email,
+      subject: `[${issue.reference}] An update on your report`,
+      heading: "An update on your report",
+      preheader: issue.title,
+      message: [issue.title, ...lines].join("\n\n"),
+      cta: { label: "Open Sparkler", url: SITE },
+    },
+  ];
 }

@@ -77,6 +77,9 @@ async function createUser(custom: Record<string, unknown> = {}) {
 beforeAll(async () => {
   const config = loadConfig();
   await connectDb(config.databaseUrl);
+  // Indexes build in the background, and the sign-in race below relies on the
+  // unique email index: without this wait it can create five accounts.
+  await Sparkler().init();
   app = createApp();
   api = () => request(app);
   expect(mongoose.connection.readyState).toBe(1);
