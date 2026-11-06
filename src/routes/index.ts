@@ -1,5 +1,7 @@
 import type { Application } from "express";
 
+import communities from "./communities.js";
+import events from "./events.js";
 import issues from "./issues.js";
 import moderation from "./moderation.js";
 import mails from "./mails.js";
@@ -15,6 +17,8 @@ import studentVerification from "./studentVerification.js";
  * mobile and web clients use, plus the admin-only mails and sparkler ops routes.
  */
 export function mountRoutes(app: Application): void {
+  app.use("/api/communities", communities);
+  app.use("/api/events", events);
   app.use("/api/issues", issues);
   app.use("/api/mails", mails);
   app.use("/api/moderation", moderation);

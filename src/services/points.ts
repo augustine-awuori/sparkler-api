@@ -1,3 +1,4 @@
+import { isDuplicateKey } from "../utils/isDuplicateKey.js";
 import { POINT_RULES, type PointAction, type PointClaimOutcome } from "../domain/points.js";
 import { PointEvent } from "../models/pointEvent.js";
 import { Sparkler } from "../models/sparkler.js";
@@ -13,8 +14,6 @@ export interface PointClaimResult {
   total: number;
 }
 
-const isDuplicateKey = (error: unknown): boolean =>
-  (error as { code?: unknown } | null)?.code === 11000;
 
 async function currentTotal(userId: string): Promise<number> {
   return (await findSparklerById(userId))?.points ?? 0;

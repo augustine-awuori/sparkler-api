@@ -137,7 +137,6 @@ describe("removed routers", () => {
   it.each([
     "/api/alumnis",
     "/api/bugs",
-    "/api/communities",
     "/api/departments",
     "/api/programmes",
     "/api/reports",
