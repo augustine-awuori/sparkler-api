@@ -7,7 +7,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../domain/errors.js";
-import { parseProfileLocation } from "../domain/user.types.js";
+import { isGraduationYear, isStudentStatus, parseProfileLocation } from "../domain/user.types.js";
 import type { StreamSourceDoc } from "../domain/stream.types.js";
 import { authedHandler, handler, type AuthedRequest } from "../http/handler.js";
 import { auth } from "../http/middlewares/authenticate.js";
@@ -262,6 +262,12 @@ async function updateOwnProfile(req: AuthedRequest<Params, ProfileBody>, res: Re
     parseProfileLocation(custom.location) === undefined
   ) {
     throw new BadRequestError("Profile location must have a valid name and optional coordinates");
+  }
+  if (custom?.studentStatus !== undefined && !isStudentStatus(custom.studentStatus)) {
+    throw new BadRequestError("Student status must be student or alumni");
+  }
+  if (custom?.graduationYear !== undefined && !isGraduationYear(custom.graduationYear)) {
+    throw new BadRequestError("Graduation year must be a four-digit year that has passed");
   }
   const username = typeof custom?.username === "string" ? custom.username.trim() : undefined;
 

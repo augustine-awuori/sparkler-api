@@ -16,6 +16,8 @@ export const PROFILE_STRING_FIELDS = [
   "school",
   "course",
   "year",
+  "studentStatus",
+  "graduationYear",
 ] as const;
 
 export type ProfileStringField = (typeof PROFILE_STRING_FIELDS)[number];
@@ -70,6 +72,24 @@ export function parseProfileLocation(value: unknown): ProfileLocation | "" | und
     coords: { lat, lng },
     ...(precision ? { precision } : {}),
   };
+}
+
+const STUDENT_STATUSES: readonly string[] = ["student", "alumni"];
+const EARLIEST_GRADUATION_YEAR = 1950;
+
+/**
+ * Blank clears either field. Both are checked here rather than in `pickProfile`,
+ * which only keeps strings and would answer 200 to a nonsense value.
+ */
+export function isStudentStatus(value: unknown): boolean {
+  return value === "" || (typeof value === "string" && STUDENT_STATUSES.includes(value));
+}
+
+export function isGraduationYear(value: unknown, now = new Date()): boolean {
+  if (value === "") return true;
+  if (typeof value !== "string" || !/^\d{4}$/.test(value)) return false;
+  const year = Number(value);
+  return year >= EARLIEST_GRADUATION_YEAR && year <= now.getFullYear();
 }
 
 export type SparklerProfile = { [K in ProfileStringField]?: string } & {
