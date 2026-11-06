@@ -21,3 +21,5 @@ npm run test:signup  # Builds, then tests the built server with Node
 - Never read environment variables at module load time or add literal credential fallbacks. Preserve the existing environment variable names.
 
 See [`.claude/rules/`](./.claude/rules/) for guidance scoped to API/auth, Stream, and mail code.
+
+What to build next, and why, is in `sparkler_mobile/docs/roadmap/campus-connection.md`.
