@@ -13,6 +13,7 @@ import { authedHandler, handler, type AuthedRequest } from "../http/handler.js";
 import { auth } from "../http/middlewares/authenticate.js";
 import { requireAdmin } from "../http/middlewares/requireAdmin.js";
 import { legacyText, withAuthToken } from "../http/respond.js";
+import { PointEvent } from "../models/pointEvent.js";
 import { PushPreference } from "../models/pushPreference.js";
 import { PushToken } from "../models/pushToken.js";
 import { Sparkler } from "../models/sparkler.js";
@@ -331,6 +332,7 @@ router.delete(
     await PushToken.deleteMany({ userId: user._id });
     await PushPreference.deleteMany({ userId: user._id });
     await scrubIssueReporter(user._id.toString());
+    await PointEvent.deleteMany({ userId: user._id.toString() });
     sendInBackground(req.log, [accountDeletedMail(user)]);
 
     try {

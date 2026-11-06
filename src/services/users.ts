@@ -86,6 +86,7 @@ export function toDirectoryUser(doc: StreamSourceDoc): DirectoryUser {
     name,
     image,
     ...(doc.timestamp ? { createdAt: new Date(doc.timestamp).toISOString() } : {}),
+    points: doc.points ?? 0,
     custom: {
       username: custom.username,
       verified: custom.verified,

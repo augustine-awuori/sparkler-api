@@ -15,6 +15,11 @@ export interface ISparkler {
   name?: string;
   image?: string;
   timestamp: number;
+  /**
+   * Beside `custom` rather than in it, because `custom` is what a profile edit
+   * writes and what Stream echoes. Only `claimPoints` changes this.
+   */
+  points: number;
 }
 
 /** JWTs are issued by issueAuthToken in services/authToken.ts, not a model method. */
@@ -39,6 +44,7 @@ const schema = new Schema<ISparkler>({
   },
   name: String,
   image: String,
+  points: { type: Number, default: 0 },
   timestamp: {
     type: Number,
     default: objectIdTimestamp,

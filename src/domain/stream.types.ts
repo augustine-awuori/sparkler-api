@@ -53,6 +53,7 @@ export interface DirectoryUser {
   image: string;
   /** ISO date. Absent on documents written before `timestamp` existed. */
   createdAt?: string;
+  points: number;
   custom: { username: string; verified: boolean; isAdmin: boolean } & SparklerProfile & {
       [K in ForbiddenOnStream]?: never;
     };
@@ -69,5 +70,6 @@ export interface StreamSourceDoc {
   name?: string | null;
   image?: string | null;
   timestamp?: number | null;
+  points?: number | null;
   custom?: SparklerCustom | null;
 }
