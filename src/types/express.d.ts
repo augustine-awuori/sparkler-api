@@ -1,4 +1,5 @@
 import type { AuthUser } from "../domain/user.types.js";
+import type { StaffMember } from "../services/developers.js";
 import type { Logger } from "../utils/logger.js";
 
 declare global {
@@ -11,6 +12,8 @@ declare global {
        * non-optional `user` via `authedHandler` instead of lying here.
        */
       user?: AuthUser;
+      /** Set by `requireIssueStaff`: the team member making the request. */
+      staff?: StaffMember;
       requestId: string;
       log: Logger;
     }

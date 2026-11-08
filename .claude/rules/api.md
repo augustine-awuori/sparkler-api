@@ -31,3 +31,10 @@ paths:
 - `POST /api/pushTokens/send-to-all` is admin-only. Stream sends most pushes itself (`scripts/configure-stream-push.ts`), so check Stream before adding a push route. Clients announce a sparkle through `POST /api/pushTokens/sparkle`, which reads the text and audience from Stream, not the request.
 - Every push passes `reachableRecipients` (`src/services/pushAudience.ts`), which drops anyone blocked either way or muting the sender (Stream Chat `muteUser`), and sends to nobody if Stream can't answer. It also drops anyone who turned that kind of push off (`PushPreference`), because `queryUsers` doesn't return Stream's own push preferences. Do not add a send path that skips it.
 - `PushToken` has one row per device: unique on `pushToken`, not on `userId`. `scripts/migrate-push-tokens.ts` moves an existing database over.
+- `/api/errors` is the error tracker that replaced Bugsnag, which wanted a paid plan. It holds errors the apps hit that nobody reported, so it's separate from `/api/issues`, which holds what users chose to report.
+  - **Ingest:** `POST /events` needs no sign-in, because a crash can happen before sign-in. It's rate-limited per caller (`rateLimit.ts`) and size-capped in `errorTracking.types.ts` so a batch fits Express's 100 KB JSON limit. A valid token's user id replaces the body's.
+  - **Grouping:** `errorFingerprint.ts` groups a caught error on its `context` label and an uncaught one on its top three frames. Line numbers, bundle hashes and ids are stripped first, so a rebuild doesn't split a group.
+  - **Regressions:** a resolved group reopens only for a version newer than `resolvedInVersion`.
+  - **The team:** `Developer` records sit outside `Sparkler.custom`, so a profile edit can't create one. A Sparkler admin is always an active team admin. `requireIssueStaff` admits active developers, to issues too.
+  - **Assignment:** assign, accept, reject and resolve each write a timeline entry and mail through `errorMail.ts` in the background. Account deletion keeps the developer record as "Deleted account".
+  - **Tests:** `tests/contract/errors.test.ts` and `tests/unit/errorFingerprint.test.ts`.

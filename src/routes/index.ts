@@ -1,6 +1,7 @@
 import type { Application } from "express";
 
 import communities from "./communities.js";
+import errors from "./errors.js";
 import events from "./events.js";
 import issues from "./issues.js";
 import moderation from "./moderation.js";
@@ -18,6 +19,7 @@ import studentVerification from "./studentVerification.js";
  */
 export function mountRoutes(app: Application): void {
   app.use("/api/communities", communities);
+  app.use("/api/errors", errors);
   app.use("/api/events", events);
   app.use("/api/issues", issues);
   app.use("/api/mails", mails);

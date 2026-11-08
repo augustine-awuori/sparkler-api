@@ -23,7 +23,7 @@ import {
   toReporterView,
   toStaffView,
 } from "../services/issues.js";
-import { findSparklerById } from "../services/users.js";
+import { staffFor } from "../services/developers.js";
 import type { Logger } from "../utils/logger.js";
 
 type IdParams = { id: string };
@@ -106,9 +106,7 @@ router.get(
   auth,
   authedHandler<IdParams>(async (req, res) => {
     const issue = await issueOr404(req.params.id);
-    const viewer = await findSparklerById(req.user.id);
-
-    if (viewer?.custom?.isAdmin) return res.send(toStaffView(issue));
+    if (await staffFor(req.user.id)) return res.send(toStaffView(issue));
     if (issue.reportedBy.userId === req.user.id) return res.send(toReporterView(issue));
     throw new NotFoundError("That issue doesn't exist");
   }),

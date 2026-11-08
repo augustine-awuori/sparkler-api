@@ -13,7 +13,12 @@ export interface AppConfig {
     readonly apiSecret: string;
   };
   readonly resendApiKey: string;
+  /** Where error-tracker emails link to. No trailing slash. */
+  readonly errorsDashboardUrl: string;
 }
+
+/** Optional, so adding the error tracker can't stop a server that lacks the variable from booting. */
+const DEFAULT_ERRORS_DASHBOARD_URL = "https://sparkler-errors.netlify.app";
 
 let cached: AppConfig | undefined;
 
@@ -39,6 +44,8 @@ export function loadConfig(): AppConfig {
       apiSecret: requireEnv("NEW_CHAT_API_SECRET"),
     },
     resendApiKey: requireEnv("RESEND_API_KEY"),
+    // `||`, so the empty line .env.example leaves still falls back.
+    errorsDashboardUrl: (optionalEnv("ERRORS_DASHBOARD_URL", "") || DEFAULT_ERRORS_DASHBOARD_URL).replace(/\/+$/, ""),
   };
 
   return cached;

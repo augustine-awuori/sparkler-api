@@ -166,6 +166,9 @@ describe("auth gating", () => {
     ["DELETE /api/sparklers", () => api().delete("/api/sparklers")],
     ["POST /api/pushTokens", () => api().post("/api/pushTokens")],
     ["POST /api/mails/all", () => api().post("/api/mails/all")],
+    ["GET /api/errors/groups", () => api().get("/api/errors/groups")],
+    ["GET /api/errors/stats", () => api().get("/api/errors/stats")],
+    ["POST /api/errors/developers/register", () => api().post("/api/errors/developers/register")],
   ];
 
   it.each(unauthenticated)("%s without a token -> 401", async (_label, call) => {

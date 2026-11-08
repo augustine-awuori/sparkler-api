@@ -31,6 +31,7 @@ import { isReservedUsername } from "../domain/reservedUsernames.js";
 import { claimOwnUserFeed } from "../services/feedOwnership.js";
 import { streamClient } from "../services/stream.js";
 import { forgetGatheringsOf } from "../services/gatherings.js";
+import { forgetDeveloper } from "../services/developers.js";
 import { forgetStudentCode } from "../services/studentVerification.js";
 import {
   findSparklerById,
@@ -336,6 +337,7 @@ router.delete(
     await PointEvent.deleteMany({ userId: user._id.toString() });
     await forgetStudentCode(user._id.toString());
     await forgetGatheringsOf(user._id.toString());
+    await forgetDeveloper(user._id.toString());
     sendInBackground(req.log, [accountDeletedMail(user)]);
 
     try {
