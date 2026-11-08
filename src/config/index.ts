@@ -34,8 +34,7 @@ export function loadConfig(): AppConfig {
   cached = {
     env: appEnv,
     port: intEnv("PORT", 3000),
-    databaseUrl:
-      appEnv === "development" ? "mongodb://127.0.0.1:27017/sparkler-api" : requireEnv("db"),
+    databaseUrl: requireEnv("db"),
     jwtSecret: requireEnv("jwtPrivateKey"),
     firebaseApiKey: requireEnv("FIREBASE_API_KEY"),
     logLevel: optionalEnv("LOG_LEVEL", env === "production" ? "info" : "debug"),

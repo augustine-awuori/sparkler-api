@@ -16,17 +16,24 @@ afterEach(() => {
 });
 
 describe("loadConfig database URL", () => {
-  it("uses local MongoDB in development, regardless of db", () => {
+  it("uses the configured db URL in development", () => {
     process.env.NODE_ENV = "development";
     process.env.db = "mongodb://remote.example/sparkler";
 
-    expect(loadConfig().databaseUrl).toBe("mongodb://127.0.0.1:27017/sparkler-api");
+    expect(loadConfig().databaseUrl).toBe("mongodb://remote.example/sparkler");
   });
 
-  it("uses the configured db URL outside development", () => {
+  it("uses the configured db URL in production", () => {
     process.env.NODE_ENV = "production";
     process.env.db = "mongodb://production.example/sparkler";
 
     expect(loadConfig().databaseUrl).toBe("mongodb://production.example/sparkler");
+  });
+
+  it("fails to load when db is missing", () => {
+    process.env.NODE_ENV = "development";
+    delete process.env.db;
+
+    expect(() => loadConfig()).toThrow(/db/);
   });
 });
