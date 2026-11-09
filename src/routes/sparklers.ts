@@ -8,6 +8,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../domain/errors.js";
+import { adminChangeSchema, verifiedChangeSchema } from "../domain/sparklerFlags.js";
 import { isGraduationYear, isStudentStatus, parseProfileLocation } from "../domain/user.types.js";
 import type { StreamSourceDoc } from "../domain/stream.types.js";
 import { authedHandler, handler, type AuthedRequest } from "../http/handler.js";
@@ -32,6 +33,7 @@ import { claimOwnUserFeed } from "../services/feedOwnership.js";
 import { streamClient } from "../services/stream.js";
 import { forgetGatheringsOf } from "../services/gatherings.js";
 import { forgetDeveloper } from "../services/developers.js";
+import { SparklerFlags } from "../services/sparklerFlags.js";
 import { forgetStudentCode } from "../services/studentVerification.js";
 import {
   findSparklerById,
@@ -347,6 +349,36 @@ router.delete(
     }
 
     res.send({ success: true });
+  }),
+);
+
+function sparklerFlags(log: Logger): SparklerFlags {
+  return new SparklerFlags({
+    syncToStream: (doc) => syncToStream(log, doc),
+    mail: (mails) => sendInBackground(log, mails),
+  });
+}
+
+// One user by id, for the admin menus on a sparkle or a profile. The bulk
+// PATCH /verify stays for scripts that only know emails.
+router.patch(
+  "/:id/verified",
+  auth,
+  requireAdmin,
+  authedHandler<{ id: string }>(async (req, res) => {
+    const { verified } = verifiedChangeSchema.parse(req.body);
+    res.send(toDirectoryUser(await sparklerFlags(req.log).setVerified(req.params.id, verified)));
+  }),
+);
+
+router.patch(
+  "/:id/admin",
+  auth,
+  requireAdmin,
+  authedHandler<{ id: string }>(async (req, res) => {
+    const { isAdmin } = adminChangeSchema.parse(req.body);
+    const user = await sparklerFlags(req.log).setAdmin(req.user.id, req.params.id, isAdmin);
+    res.send(toDirectoryUser(user));
   }),
 );
 

@@ -187,6 +187,8 @@ describe("auth gating", () => {
 
   it.each([
     ["PATCH", "/api/sparklers/sync"],
+    ["PATCH", "/api/sparklers/000000000000000000000000/verified"],
+    ["PATCH", "/api/sparklers/000000000000000000000000/admin"],
     ["POST", "/api/mails/preview"],
     ["POST", "/api/mails/all"],
   ])("admin-only %s %s rejects a non-admin with 403", async (method, path) => {

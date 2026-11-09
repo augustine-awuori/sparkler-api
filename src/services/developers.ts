@@ -140,6 +140,15 @@ export async function forgetDeveloper(sparklerId: string): Promise<void> {
   );
 }
 
+/**
+ * When someone stops being a Sparkler admin. `staffFor` made them a team admin
+ * automatically, so without this they would keep error-tracker access. The
+ * record stays for the same reason as in `forgetDeveloper`.
+ */
+export async function revokeDeveloperAccess(sparklerId: string): Promise<void> {
+  await Developer.updateOne({ sparklerId }, { $set: { status: "removed", role: "developer" } });
+}
+
 export async function staffAdmins(): Promise<DeveloperDoc[]> {
   return await Developer.find({ role: "admin", status: "active" });
 }
