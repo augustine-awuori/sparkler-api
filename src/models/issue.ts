@@ -48,6 +48,8 @@ export interface IIssue {
   /** In the schema for the IT team's app; nothing uploads to it yet. */
   attachments: { url: string; kind: string }[];
   resolution: { summary: string; resolvedBy: string; resolvedAt: Date } | null;
+  /** Set once, when resolving it earned the reporter points. Survives a reopen. */
+  reward: { points: number; awardedAt: Date } | null;
   timeline: IssueTimelineEntry[];
   createdAt: Date;
   updatedAt: Date;
@@ -114,6 +116,13 @@ const schema = new Schema<IIssue>(
           resolvedBy: { type: String, required: true },
           resolvedAt: { type: Date, required: true },
         },
+        person,
+      ),
+      default: null,
+    },
+    reward: {
+      type: new Schema(
+        { points: { type: Number, required: true }, awardedAt: { type: Date, required: true } },
         person,
       ),
       default: null,

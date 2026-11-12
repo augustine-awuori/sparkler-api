@@ -27,4 +27,15 @@ export const pointClaimSchema = z.object({
   targetId: z.string().trim().min(1).max(200),
 });
 
+/**
+ * What a reporter earns when the team resolves their report. Deliberately not in
+ * `POINT_RULES`: the server awards it, so `/points/claims` must never accept it.
+ */
+export const ISSUE_RESOLVED_ACTION = "issue_resolved";
+export const ISSUE_RESOLVED_POINTS = 50;
+
+/** Everything the ledger can hold: what people claim, and what the server awards. */
+export const LEDGER_ACTIONS = [...POINT_ACTIONS, ISSUE_RESOLVED_ACTION] as const;
+export type LedgerAction = (typeof LEDGER_ACTIONS)[number];
+
 export type PointClaimOutcome = "awarded" | "already_claimed" | "daily_cap" | "not_verified";

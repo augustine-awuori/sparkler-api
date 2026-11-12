@@ -1,10 +1,10 @@
 import { Schema, model } from "mongoose";
 
-import { POINT_ACTIONS, type PointAction } from "../domain/points.js";
+import { LEDGER_ACTIONS, type LedgerAction } from "../domain/points.js";
 
 export interface IPointEvent {
   userId: string;
-  action: PointAction;
+  action: LedgerAction;
   targetId: string;
   points: number;
   createdAt: Date;
@@ -12,7 +12,7 @@ export interface IPointEvent {
 
 const schema = new Schema<IPointEvent>({
   userId: { type: String, required: true },
-  action: { type: String, enum: POINT_ACTIONS, required: true },
+  action: { type: String, enum: LEDGER_ACTIONS, required: true },
   targetId: { type: String, required: true },
   points: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now },

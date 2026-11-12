@@ -2,15 +2,21 @@ import type { z } from "zod";
 
 import { NotFoundError } from "../domain/errors.js";
 import {
+  ISSUE_STATUSES,
   RESOLVED_STATUSES,
   type IssueStatus,
   type issueChangeSchema,
+  type issueListQuerySchema,
   type issueNoteSchema,
   type newIssueSchema,
 } from "../domain/issue.types.js";
+import { ISSUE_RESOLVED_ACTION, ISSUE_RESOLVED_POINTS } from "../domain/points.js";
 import { nextInSequence } from "../models/counter.js";
 import { Issue, type IIssue, type IssueDoc, type IssueTimelineEntry } from "../models/issue.js";
+import { PointEvent } from "../models/pointEvent.js";
 import { Sparkler } from "../models/sparkler.js";
+import { isDuplicateKey } from "../utils/isDuplicateKey.js";
+import type { PushPayload } from "../utils/pushNotifications.js";
 import { findSparklerById } from "./users.js";
 import type { MailInput } from "./mail.js";
 
@@ -36,6 +42,9 @@ export function toReporterView(issue: IssueDoc) {
     resolution: issue.resolution
       ? { summary: issue.resolution.summary, resolvedAt: issue.resolution.resolvedAt }
       : null,
+    reward: issue.reward
+      ? { points: issue.reward.points, awardedAt: issue.reward.awardedAt }
+      : null,
     timeline: issue.timeline
       .filter((entry) => entry.visibility === "reporter")
       .map(({ at, kind, from, to, body }) => ({ at, kind, from, to, body })),
@@ -44,7 +53,67 @@ export function toReporterView(issue: IssueDoc) {
 
 export function toStaffView(issue: IssueDoc) {
   const { _id, __v: _version, ...fields } = issue.toObject();
-  return { id: _id.toString(), ...fields };
+  return { id: _id.toString(), ...fields, reward: fields.reward ?? null };
+}
+
+/**
+ * One issue for the team, with what the dashboard shows beside the report: the
+ * reporter's photo, how often they write in, and whether resolving it can pay.
+ */
+export async function toStaffDetail(issue: IssueDoc) {
+  const { userId } = issue.reportedBy;
+  const [reporter, totalReports] = await Promise.all([
+    findSparklerById(userId),
+    Issue.countDocuments({ "reportedBy.userId": userId }),
+  ]);
+  return {
+    ...toStaffView(issue),
+    reporter: {
+      image: reporter?.image ?? "",
+      isAdmin: reporter?.custom?.isAdmin === true,
+      exists: Boolean(reporter),
+      totalReports,
+    },
+  };
+}
+
+/** How many issues sit in each status, and how many live ones nobody has taken. */
+export async function issueSummary() {
+  const [rows, unhandled] = await Promise.all([
+    Issue.aggregate<{ _id: IssueStatus; count: number }>([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    Issue.countDocuments({ status: { $nin: RESOLVED_STATUSES }, handledBy: null }),
+  ]);
+  const byStatus = Object.fromEntries(
+    ISSUE_STATUSES.map((status) => [status, rows.find((row) => row._id === status)?.count ?? 0]),
+  ) as Record<IssueStatus, number>;
+  return { byStatus, unhandled, total: rows.reduce((sum, row) => sum + row.count, 0) };
+}
+
+const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The Mongo filter for the team's list. `q` is matched as text, never as a pattern. */
+export function issueListFilter({
+  status,
+  priority,
+  type,
+  source,
+  handledBy,
+  q,
+  cursor,
+}: Omit<z.infer<typeof issueListQuerySchema>, "limit">) {
+  const text = q ? new RegExp(escapeRegex(q), "i") : null;
+  return {
+    ...(status && { status }),
+    ...(priority && { priority }),
+    ...(type && { type }),
+    ...(source && { source }),
+    ...(handledBy === "none" && { handledBy: null }),
+    ...(handledBy && handledBy !== "none" && { "handledBy.userId": handledBy }),
+    ...(text && { $or: [{ title: text }, { description: text }, { reference: text }] }),
+    ...(cursor && { _id: { $lt: cursor } }),
+  };
 }
 
 export async function isReportLimitReached(userId: string): Promise<boolean> {
@@ -80,6 +149,32 @@ function resolutionFor(status: IssueStatus, summary: string, actorId: string, at
 }
 
 /**
+ * Thanks the reporter with points, once per issue however often it's reopened:
+ * the ledger's unique index is what refuses a second payment. Admins earn
+ * nothing for reports, and nor does anyone resolving their own.
+ */
+async function rewardReporter(issue: IssueDoc, actorId: string, at: Date): Promise<void> {
+  const reporterId = issue.reportedBy.userId;
+  if (reporterId === actorId) return;
+  const reporter = await findSparklerById(reporterId);
+  if (!reporter || reporter.custom?.isAdmin) return;
+
+  try {
+    await PointEvent.create({
+      userId: reporterId,
+      action: ISSUE_RESOLVED_ACTION,
+      targetId: issue._id.toString(),
+      points: ISSUE_RESOLVED_POINTS,
+    });
+  } catch (error) {
+    if (isDuplicateKey(error)) return;
+    throw error;
+  }
+  await Sparkler.updateOne({ _id: reporterId }, { $inc: { points: ISSUE_RESOLVED_POINTS } });
+  issue.reward = { points: ISSUE_RESOLVED_POINTS, awardedAt: at };
+}
+
+/**
  * Staff changes, each recorded on the timeline. A reporter sees status changes
  * and resolution notes, but not assignment or priority, which are about how the
  * team works.
@@ -99,6 +194,7 @@ export async function applyIssueChange(
     record({ kind: "status_changed", visibility: "reporter", from: issue.status, to: status });
     issue.status = status;
     issue.resolution = resolutionFor(status, resolutionSummary ?? "", actorId, now);
+    if (status === "resolved") await rewardReporter(issue, actorId, now);
   } else if (resolutionSummary !== undefined && issue.resolution) {
     issue.resolution.summary = resolutionSummary;
     record({ kind: "note", visibility: "reporter", body: resolutionSummary });
@@ -178,10 +274,51 @@ const STATUS_WORDS: Record<IssueStatus, string> = {
   closed: "We've closed it.",
 };
 
-function describeForReporter(entry: IssueTimelineEntry): string | null {
+const isResolving = (entry: IssueTimelineEntry): boolean =>
+  entry.kind === "status_changed" && entry.to === "resolved";
+
+/** The points this change earned, or 0: a second resolve of a paid issue earns nothing new. */
+function pointsJustEarned(issue: IssueDoc, newEntries: readonly IssueTimelineEntry[]): number {
+  const awardedAt = issue.reward?.awardedAt.getTime();
+  const earnedNow = newEntries.some(
+    (entry) => isResolving(entry) && new Date(entry.at).getTime() === awardedAt,
+  );
+  return earnedNow ? (issue.reward?.points ?? 0) : 0;
+}
+
+function thanksFor(points: number): string {
+  return points
+    ? `It's resolved. Thank you for telling us: you've earned ${points} points for helping make Sparkler better.`
+    : "It's resolved. Thank you for telling us. It helped make Sparkler better.";
+}
+
+function describeForReporter(entry: IssueTimelineEntry, issue: IssueDoc, points: number): string | null {
   if (entry.visibility !== "reporter") return null;
+  if (isResolving(entry)) {
+    const fix = issue.resolution?.summary;
+    return fix ? `${thanksFor(points)}\n\nWhat we did: ${fix}` : thanksFor(points);
+  }
   if (entry.kind === "status_changed") return STATUS_WORDS[entry.to as IssueStatus] ?? null;
   return entry.body ?? null;
+}
+
+/**
+ * The congratulation for the reporter's phone when their report is resolved,
+ * or null for any other change. `kind` is what the app routes the tap by.
+ */
+export function reporterResolvedPush(
+  issue: IssueDoc,
+  newEntries: readonly IssueTimelineEntry[],
+): PushPayload | null {
+  if (!newEntries.some(isResolving)) return null;
+  const points = pointsJustEarned(issue, newEntries);
+  return {
+    title: "Your report is resolved \u{1F389}",
+    message: points
+      ? `Thank you! "${issue.title}" is fixed, and you've earned ${points} points.`
+      : `Thank you! "${issue.title}" is fixed.`,
+    data: { kind: "issue_resolved", type: "issue_resolved", id: issue._id.toString() },
+  };
 }
 
 /**
@@ -192,15 +329,20 @@ export async function reporterUpdateMail(
   issue: IssueDoc,
   newEntries: readonly IssueTimelineEntry[],
 ): Promise<MailInput[]> {
-  const lines = newEntries.map(describeForReporter).filter((line): line is string => Boolean(line));
+  const points = pointsJustEarned(issue, newEntries);
+  const lines = newEntries
+    .map((entry) => describeForReporter(entry, issue, points))
+    .filter((line): line is string => Boolean(line));
   if (!lines.length) return [];
+  const resolved = newEntries.some(isResolving);
+  const heading = resolved ? "Your report is fixed. Thank you!" : "An update on your report";
   const reporter = await findSparklerById(issue.reportedBy.userId);
   if (!reporter) return [];
   return [
     {
       to: reporter.email,
-      subject: `[${issue.reference}] An update on your report`,
-      heading: "An update on your report",
+      subject: `[${issue.reference}] ${heading}`,
+      heading,
       preheader: issue.title,
       message: [issue.title, ...lines].join("\n\n"),
       cta: { label: "Open Sparkler", url: SITE },

@@ -67,7 +67,11 @@ export const newIssueSchema = z.object({
 export const issueListQuerySchema = z.object({
   status: z.enum(ISSUE_STATUSES).optional(),
   priority: z.enum(ISSUE_PRIORITIES).optional(),
+  type: z.enum(ISSUE_TYPES).optional(),
+  source: z.enum(ISSUE_SOURCES).optional(),
   handledBy: z.union([z.literal("none"), z.string().regex(OBJECT_ID)]).optional(),
+  /** Matched as plain text against the title, description and reference. */
+  q: z.string().trim().min(1).max(100).optional(),
   cursor: z.string().regex(OBJECT_ID).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

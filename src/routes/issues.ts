@@ -18,11 +18,17 @@ import {
   applyIssueChange,
   createIssue,
   isReportLimitReached,
+  issueListFilter,
   issueReportedMails,
+  issueSummary,
+  reporterResolvedPush,
   reporterUpdateMail,
   toReporterView,
+  toStaffDetail,
   toStaffView,
 } from "../services/issues.js";
+import { pushTokensOf } from "../services/pushAudience.js";
+import { sendPushNotificationTo } from "../utils/pushNotifications.js";
 import { staffFor } from "../services/developers.js";
 import type { Logger } from "../utils/logger.js";
 
@@ -38,9 +44,16 @@ async function issueOr404(id: string): Promise<IssueDoc> {
 
 /** Never awaited: a mail problem must not undo a change that's already saved. */
 function tellReporter(log: Logger, issue: IssueDoc, entriesSeen: number) {
-  reporterUpdateMail(issue, issue.timeline.slice(entriesSeen))
+  const newEntries = issue.timeline.slice(entriesSeen);
+  reporterUpdateMail(issue, newEntries)
     .then((mails) => (mails.length ? sendInBackground(log, mails) : undefined))
     .catch((err: unknown) => log.error({ err }, "Could not mail a reporter about their issue"));
+
+  const push = reporterResolvedPush(issue, newEntries);
+  if (!push) return;
+  pushTokensOf([issue.reportedBy.userId])
+    .then((tokens) => sendPushNotificationTo(tokens, push))
+    .catch((err: unknown) => log.error({ err }, "Could not notify a reporter about their issue"));
 }
 
 router.post(
@@ -80,16 +93,9 @@ router.get(
   auth,
   requireIssueStaff,
   authedHandler(async (req, res) => {
-    const { status, priority, handledBy, cursor, limit } = issueListQuerySchema.parse(req.query);
-    const filter = {
-      ...(status && { status }),
-      ...(priority && { priority }),
-      ...(handledBy === "none" && { handledBy: null }),
-      ...(handledBy && handledBy !== "none" && { "handledBy.userId": handledBy }),
-      ...(cursor && { _id: { $lt: cursor } }),
-    };
+    const { limit, ...query } = issueListQuerySchema.parse(req.query);
 
-    const issues = await Issue.find(filter)
+    const issues = await Issue.find(issueListFilter(query))
       .sort({ _id: -1 })
       .limit(limit + 1);
     const page = issues.slice(0, limit);
@@ -100,13 +106,23 @@ router.get(
   }),
 );
 
+// Before `/:id`, like `/mine`.
+router.get(
+  "/summary",
+  auth,
+  requireIssueStaff,
+  authedHandler(async (_req, res) => {
+    res.send(await issueSummary());
+  }),
+);
+
 // Answers 404 rather than 403 to anyone else, so it doesn't confirm an id exists.
 router.get(
   "/:id",
   auth,
   authedHandler<IdParams>(async (req, res) => {
     const issue = await issueOr404(req.params.id);
-    if (await staffFor(req.user.id)) return res.send(toStaffView(issue));
+    if (await staffFor(req.user.id)) return res.send(await toStaffDetail(issue));
     if (issue.reportedBy.userId === req.user.id) return res.send(toReporterView(issue));
     throw new NotFoundError("That issue doesn't exist");
   }),

@@ -15,6 +15,12 @@ vi.mock("../../src/services/mail.js", async (original) => ({
   sendMailBatch: mail.sendMailBatch,
 }));
 
+const push = vi.hoisted(() => ({ sendPushNotificationTo: vi.fn(async () => undefined) }));
+vi.mock("../../src/utils/pushNotifications.js", async (original) => ({
+  ...(await original<object>()),
+  sendPushNotificationTo: push.sendPushNotificationTo,
+}));
+
 let app: Application;
 let count = 0;
 
@@ -316,5 +322,157 @@ describe("deleting an account", () => {
     const stored = await Issue.findById(created.id);
     expect(stored?.title).toBe(REPORT.title);
     expect(stored?.reportedBy).toMatchObject({ name: "Deleted account", username: "" });
+  });
+});
+
+describe("thanking the reporter when their report is resolved", () => {
+  const pointsOf = async (id: string) => (await Sparkler.findById(id))?.points ?? 0;
+
+  async function aReport(reporter: Awaited<ReturnType<typeof aUser>>) {
+    const { body } = await reporter.as("post", "/api/issues").send(REPORT);
+    return { id: body.id as string, path: `/api/issues/${body.id}` };
+  }
+
+  it("gives them points once, mails and notifies them, and shows it on their report", async () => {
+    const admin = await aUser({ isAdmin: true });
+    const reporter = await aUser();
+    const report = await aReport(reporter);
+    const reporterDoc = await Sparkler.findById(reporter.id);
+
+    const resolved = await admin
+      .as("patch", report.path)
+      .send({ status: "resolved", resolutionSummary: "Fixed in 1.2.4" });
+
+    expect(resolved.body.reward).toMatchObject({ points: 50 });
+    expect(await pointsOf(reporter.id)).toBe(50);
+
+    await vi.waitFor(() => expect(push.sendPushNotificationTo).toHaveBeenCalled());
+    const [, payload] = push.sendPushNotificationTo.mock.calls[0] as unknown as [
+      string[],
+      { message: string; data: { kind: string; id: string } },
+    ];
+    expect(payload.message).toContain("50 points");
+    expect(payload.data).toMatchObject({ kind: "issue_resolved", id: report.id });
+
+    await vi.waitFor(() => {
+      const thanks = mail.sendMailBatch.mock.calls
+        .flatMap((call) => (call as unknown as [{ to: string; subject: string; message: string }[]])[0])
+        .find((sent) => sent.to === reporterDoc?.email);
+      expect(thanks?.subject).toContain("Thank you");
+      expect(thanks?.message).toContain("50 points");
+      expect(thanks?.message).toContain("Fixed in 1.2.4");
+    });
+
+    const { body: mine } = await reporter.as("get", "/api/issues/mine");
+    expect(mine[0].reward).toMatchObject({ points: 50 });
+  });
+
+  it("doesn't pay again when the report is reopened and resolved a second time", async () => {
+    const admin = await aUser({ isAdmin: true });
+    const reporter = await aUser();
+    const report = await aReport(reporter);
+
+    await admin.as("patch", report.path).send({ status: "resolved" });
+    await admin.as("patch", report.path).send({ status: "open" });
+    await vi.waitFor(() => expect(push.sendPushNotificationTo).toHaveBeenCalledTimes(1));
+    const again = await admin.as("patch", report.path).send({ status: "resolved" });
+
+    expect(await pointsOf(reporter.id)).toBe(50);
+    expect(again.body.reward).toMatchObject({ points: 50 });
+    await vi.waitFor(() => expect(push.sendPushNotificationTo).toHaveBeenCalledTimes(2));
+    const [, second] = push.sendPushNotificationTo.mock.calls[1] as unknown as [string[], { message: string }];
+    expect(second.message).not.toContain("points");
+  });
+
+  it("gives nothing for a report that's closed rather than resolved", async () => {
+    const admin = await aUser({ isAdmin: true });
+    const reporter = await aUser();
+    const report = await aReport(reporter);
+
+    const closed = await admin.as("patch", report.path).send({ status: "closed" });
+
+    expect(closed.body.reward).toBeNull();
+    expect(await pointsOf(reporter.id)).toBe(0);
+    await new Promise((settled) => setTimeout(settled, 50));
+    expect(push.sendPushNotificationTo).not.toHaveBeenCalled();
+  });
+
+  it("gives an admin no points for their own report, but still thanks them", async () => {
+    const admin = await aUser({ isAdmin: true });
+    const reportingAdmin = await aUser({ isAdmin: true });
+    const report = await aReport(reportingAdmin);
+
+    const resolved = await admin.as("patch", report.path).send({ status: "resolved" });
+
+    expect(resolved.body.reward).toBeNull();
+    expect(await pointsOf(reportingAdmin.id)).toBe(0);
+    await vi.waitFor(() => expect(push.sendPushNotificationTo).toHaveBeenCalled());
+    const [, payload] = push.sendPushNotificationTo.mock.calls[0] as unknown as [string[], { message: string }];
+    expect(payload.message).toContain("Thank you");
+    expect(payload.message).not.toContain("points");
+  });
+
+  it("can't be claimed through the points route", async () => {
+    const reporter = await aUser();
+    const report = await aReport(reporter);
+
+    const claim = await reporter
+      .as("post", "/api/points/claims")
+      .send({ action: "issue_resolved", targetId: report.id });
+
+    expect(claim.status).toBe(400);
+    expect(await pointsOf(reporter.id)).toBe(0);
+  });
+});
+
+describe("what the dashboard reads", () => {
+  it("searches as plain text, and filters by type and source", async () => {
+    const admin = await aUser({ isAdmin: true });
+    const reporter = await aUser();
+    const marker = `needle${Date.now()}`;
+    const { body: wanted } = await reporter
+      .as("post", "/api/issues")
+      .send({ ...REPORT, type: "feedback", source: "web", title: `Idea (${marker}) for polls` });
+    await reporter.as("post", "/api/issues").send(REPORT);
+
+    const ids = async (query: Record<string, string>) =>
+      (await admin.as("get", "/api/issues").query(query)).body.issues.map((issue: { id: string }) => issue.id);
+
+    expect(await ids({ q: `(${marker})` })).toEqual([wanted.id]);
+    expect(await ids({ q: marker.toUpperCase(), type: "feedback", source: "web" })).toEqual([wanted.id]);
+    expect(await ids({ q: marker, type: "bug" })).toEqual([]);
+    expect(await ids({ q: `${marker}.*` })).toEqual([]);
+  });
+
+  it("counts issues by status, and the live ones nobody has taken", async () => {
+    const admin = await aUser({ isAdmin: true });
+    const reporter = await aUser();
+    const before = (await admin.as("get", "/api/issues/summary")).body;
+
+    await reporter.as("post", "/api/issues").send(REPORT);
+    const { body: taken } = await reporter.as("post", "/api/issues").send(REPORT);
+    await admin.as("patch", `/api/issues/${taken.id}`).send({ status: "in_progress", handledBy: admin.id });
+
+    const after = await admin.as("get", "/api/issues/summary");
+    expect(after.status).toBe(200);
+    expect(after.body.byStatus.open - before.byStatus.open).toBe(1);
+    expect(after.body.byStatus.in_progress - before.byStatus.in_progress).toBe(1);
+    expect(after.body.unhandled - before.unhandled).toBe(1);
+    expect(after.body.total - before.total).toBe(2);
+
+    expect((await reporter.as("get", "/api/issues/summary")).status).toBe(403);
+  });
+
+  it("adds the reporter's photo, admin flag and report count to one issue, for staff only", async () => {
+    const admin = await aUser({ isAdmin: true });
+    const reporter = await aUser();
+    await reporter.as("post", "/api/issues").send(REPORT);
+    const { body: created } = await reporter.as("post", "/api/issues").send(REPORT);
+
+    const staffView = await admin.as("get", `/api/issues/${created.id}`);
+    expect(staffView.body.reporter).toEqual({ image: "", isAdmin: false, exists: true, totalReports: 2 });
+
+    const own = await reporter.as("get", `/api/issues/${created.id}`);
+    expect(own.body.reporter).toBeUndefined();
   });
 });
