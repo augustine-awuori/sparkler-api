@@ -10,7 +10,9 @@
  * defaults send data only, for apps that draw the banner themselves, which ours
  * don't. Resparkles, quotes and anonymous replies set `skip_push` and go through
  * our own route, because the docs don't confirm a template can branch on a
- * reaction's type or see custom fields.
+ * reaction's type or see custom fields. Every reply now does too
+ * (`POST /pushTokens/reply`): the Stream app has no Firebase provider, so this
+ * template never reached Android. It stays for older app builds.
  */
 
 export type StreamPushEvent =

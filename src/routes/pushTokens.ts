@@ -7,6 +7,8 @@ import { requireAdmin } from "../http/middlewares/requireAdmin.js";
 import { PUSH_CATEGORIES, PushPreference, type PushCategory } from "../models/pushPreference.js";
 import { PushToken } from "../models/pushToken.js";
 import { pushTokensOf, reachableRecipients } from "../services/pushAudience.js";
+import { announceMessage } from "../services/messageAnnouncement.js";
+import { announceReply } from "../services/replyAnnouncement.js";
 import { announceSparkle } from "../services/sparkleAnnouncement.js";
 import { sendPushNotificationTo } from "../utils/pushNotifications.js";
 
@@ -113,15 +115,35 @@ router.put(
   }),
 );
 
+function requiredId(value: unknown, what: string): string {
+  if (typeof value !== "string" || !value) throw new BadRequestError(`${what} id is required`);
+  return value;
+}
+
 router.post(
   "/sparkle",
   auth,
   authedHandler<Record<string, string>, { activityId?: unknown }>(async (req, res) => {
-    const { activityId } = req.body;
-    if (typeof activityId !== "string" || !activityId) {
-      throw new BadRequestError("Activity id is required");
-    }
+    const activityId = requiredId(req.body.activityId, "Activity");
     res.send({ outcome: await announceSparkle(req.user.id, activityId) });
+  }),
+);
+
+router.post(
+  "/reply",
+  auth,
+  authedHandler<Record<string, string>, { commentId?: unknown }>(async (req, res) => {
+    const commentId = requiredId(req.body.commentId, "Reply");
+    res.send({ outcome: await announceReply(req.user.id, commentId) });
+  }),
+);
+
+router.post(
+  "/message",
+  auth,
+  authedHandler<Record<string, string>, { messageId?: unknown }>(async (req, res) => {
+    const messageId = requiredId(req.body.messageId, "Message");
+    res.send({ outcome: await announceMessage(req.user.id, messageId) });
   }),
 );
 

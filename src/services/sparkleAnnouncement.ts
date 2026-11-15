@@ -1,17 +1,22 @@
 import { ForbiddenError, UpstreamError } from "../domain/errors.js";
 import { PushAnnouncement } from "../models/pushAnnouncement.js";
-import { logger } from "../utils/logger.js";
-import { sendPushNotificationTo, type PushPayload } from "../utils/pushNotifications.js";
-import { everyoneWithAPushToken, pushTokensOf, reachableRecipients } from "./pushAudience.js";
+import type { PushPayload } from "../utils/pushNotifications.js";
+import {
+  claimAnnouncement,
+  deliverInBackground,
+  handleOf,
+  pushBody,
+  pushTitle,
+  stringOrUndefined,
+} from "./announcements.js";
+import { everyoneWithAPushToken } from "./pushAudience.js";
 import { streamClient } from "./stream.js";
 
-/** Room for a name and a couple of lines on a lock screen. */
-const MAX_BODY_CHARS = 140;
+const NEW_SPARKLE = "shared a new sparkle";
 const FOLLOWS_PER_PAGE = 100;
 /** Each anonymous sparkle reaches every account, so one person can't do it endlessly. */
 export const MAX_ANONYMOUS_PER_HOUR = 5;
 const HOUR_MS = 60 * 60 * 1000;
-const DUPLICATE_KEY = 11000;
 
 export type AnnouncementOutcome = "announced" | "already_announced" | "not_public" | "rate_limited";
 
@@ -38,10 +43,8 @@ export async function announceSparkle(
 
   if (!(await claimAnnouncement(activityId, authorId, anonymous))) return "already_announced";
 
-  const plan = anonymous ? anonymousPlan(activity) : followersPlan(activity);
-  void deliver(authorId, plan).catch((err: unknown) => {
-    logger().error({ err, activityId }, "Could not announce a sparkle");
-  });
+  const { recipients, push } = anonymous ? anonymousPlan(activity) : followersPlan(activity);
+  deliverInBackground(authorId, recipients, "sparkles", push, "Could not announce a sparkle");
   return "announced";
 }
 
@@ -69,29 +72,9 @@ function anonymousInLastHour(authorId: string): Promise<number> {
   });
 }
 
-async function claimAnnouncement(
-  activityId: string,
-  authorId: string,
-  anonymous: boolean,
-): Promise<boolean> {
-  try {
-    await PushAnnouncement.create({ activityId, authorId, anonymous });
-    return true;
-  } catch (err) {
-    if ((err as { code?: number }).code === DUPLICATE_KEY) return false;
-    throw err;
-  }
-}
-
-async function deliver(senderId: string, { recipients, push }: AnnouncementPlan): Promise<void> {
-  const reachable = await reachableRecipients(senderId, await recipients(), "sparkles");
-  const tokens = await pushTokensOf(reachable);
-  await sendPushNotificationTo(tokens, push);
-}
-
 function followersPlan(activity: Activity): AnnouncementPlan {
   const author = activity.user;
-  const handle = stringOrUndefined(author.custom?.["username"]);
+  const handle = handleOf(author);
   // These people get their own, more specific push ("mentioned you") from the
   // author's app, and one action should mean one buzz.
   const toldSeparately = new Set([
@@ -104,7 +87,7 @@ function followersPlan(activity: Activity): AnnouncementPlan {
       (await acceptedFollowerIds(author.id)).filter((id) => !toldSeparately.has(id)),
     push: {
       title: pushTitle(author.name, handle),
-      message: pushBody(activity.text),
+      message: pushBody(activity.text, NEW_SPARKLE),
       data: { kind: "sparkle", type: "sparkle", id: activity.id, ...(handle ? { handle } : {}) },
     },
   };
@@ -115,7 +98,7 @@ function anonymousPlan(activity: Activity): AnnouncementPlan {
     recipients: everyoneWithAPushToken,
     push: {
       title: stringOrUndefined(activity.custom?.["anonymous_alias"]) ?? "Anonymous",
-      message: pushBody(activity.text),
+      message: pushBody(activity.text, NEW_SPARKLE),
       // No handle: it would name the author on every lock screen it reaches.
       data: { kind: "sparkle", type: "sparkle", id: activity.id },
     },
@@ -140,21 +123,4 @@ async function acceptedFollowerIds(authorId: string): Promise<string[]> {
   } while (next);
 
   return [...ids];
-}
-
-function pushTitle(name: string | undefined, handle: string | undefined): string {
-  if (name && handle) return `${name} (@${handle})`;
-  if (name) return name;
-  return handle ? `@${handle}` : "Sparkler";
-}
-
-/** Newlines would render as real breaks, and an empty body as a blank banner. */
-function pushBody(text: string | undefined): string {
-  const line = text?.replace(/\s+/g, " ").trim();
-  if (!line) return "shared a new sparkle";
-  return line.length > MAX_BODY_CHARS ? `${line.slice(0, MAX_BODY_CHARS - 1).trimEnd()}…` : line;
-}
-
-function stringOrUndefined(value: unknown): string | undefined {
-  return typeof value === "string" && value ? value : undefined;
 }
