@@ -6,6 +6,7 @@ import { logger } from "../utils/logger.js";
 import { streamClient } from "./stream.js";
 
 const BLOCK_LOOKUP_BATCH = 100;
+const FOLLOWS_PER_PAGE = 100;
 
 /**
  * Whoever may hear about something `senderId` did.
@@ -67,4 +68,27 @@ export async function pushTokensOf(userIds: readonly string[]): Promise<string[]
 export async function everyoneWithAPushToken(): Promise<string[]> {
   const ids = await PushToken.distinct("userId");
   return ids.map((id) => id.toString());
+}
+
+/**
+ * Followers who left push on for this account. A follower's id is their source
+ * feed's own id: `timeline:<id>` follows `user:<id>`.
+ */
+export async function acceptedFollowerIds(authorId: string): Promise<string[]> {
+  const ids = new Set<string>();
+  let next: string | undefined;
+
+  do {
+    const page = await streamClient().feeds.queryFollows({
+      filter: { target_feed: `user:${authorId}`, status: "accepted" },
+      limit: FOLLOWS_PER_PAGE,
+      ...(next ? { next } : {}),
+    });
+    for (const follow of page.follows) {
+      if (follow.push_preference !== "none") ids.add(follow.source_feed.id);
+    }
+    next = page.next;
+  } while (next);
+
+  return [...ids];
 }

@@ -7,6 +7,7 @@ import { requireAdmin } from "../http/middlewares/requireAdmin.js";
 import { PUSH_CATEGORIES, PushPreference, type PushCategory } from "../models/pushPreference.js";
 import { PushToken } from "../models/pushToken.js";
 import { pushTokensOf, reachableRecipients } from "../services/pushAudience.js";
+import { announceEngagement, engagementSchema } from "../services/engagementAnnouncement.js";
 import { announceMessage } from "../services/messageAnnouncement.js";
 import { announceReply } from "../services/replyAnnouncement.js";
 import { announceSparkle } from "../services/sparkleAnnouncement.js";
@@ -135,6 +136,15 @@ router.post(
   authedHandler<Record<string, string>, { commentId?: unknown }>(async (req, res) => {
     const commentId = requiredId(req.body.commentId, "Reply");
     res.send({ outcome: await announceReply(req.user.id, commentId) });
+  }),
+);
+
+router.post(
+  "/engagement",
+  auth,
+  authedHandler(async (req, res) => {
+    const { action, targetId } = engagementSchema.parse(req.body);
+    res.send({ outcome: await announceEngagement(req.user.id, action, targetId) });
   }),
 );
 

@@ -160,8 +160,15 @@ describe("POST /api/pushTokens/sparkle", () => {
 
     await announce(author);
 
-    await sent();
-    expect(lastSend()[0]).toEqual([deviceOf(normal)]);
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2), { timeout: 20_000 });
+    const pushes = send.mock.calls as unknown as [string[], Record<string, unknown>][];
+    const sendTitled = (title: string) => pushes.find(([, push]) => push.title === title);
+    expect(sendTitled("Kai (@kai)")?.[0]).toEqual([deviceOf(normal)]);
+    // The quoted author hears "quoted your sparkle" from the app instead.
+    expect(sendTitled("Kai mentioned you")?.[0]).toEqual([deviceOf(mentioned)]);
+    expect(sendTitled("Kai mentioned you")?.[1]).toMatchObject({
+      data: { kind: "mention", id: "activity-1" },
+    });
   });
 
   it("refuses someone else's sparkle and doesn't announce it", async () => {

@@ -1,5 +1,11 @@
 import { ForbiddenError, UpstreamError } from "../domain/errors.js";
-import { claimAnnouncement, deliverInBackground, handleOf, pushBody } from "./announcements.js";
+import {
+  claimAnnouncement,
+  deliverInBackground,
+  handleOf,
+  mentionPush,
+  pushBody,
+} from "./announcements.js";
 import { streamClient } from "./stream.js";
 
 export type ReplyOutcome = "announced" | "already_announced" | "anonymous";
@@ -20,9 +26,13 @@ export async function announceReply(senderId: string, commentId: string): Promis
   if (!(await claimAnnouncement(`comment:${commentId}`, senderId))) return "already_announced";
 
   const handle = handleOf(reply.user);
+  // Read once: both the reply push and the mention push need it.
+  let answered: Promise<string[]> | undefined;
+  const answeredIds = () => (answered ??= repliedTo(reply));
+
   deliverInBackground(
     senderId,
-    () => repliedTo(reply),
+    answeredIds,
     "replies",
     {
       title: `${reply.user.name || (handle ? `@${handle}` : "Someone")} replied`,
@@ -32,6 +42,21 @@ export async function announceReply(senderId: string, commentId: string): Promis
     },
     "Could not announce a reply",
   );
+
+  const mentioned = (reply.mentioned_users ?? []).map((user) => user.id);
+  if (mentioned.length) {
+    deliverInBackground(
+      senderId,
+      // Whoever was replied to already hears "replied": one action, one buzz.
+      async () => {
+        const repliedToIds = new Set(await answeredIds());
+        return mentioned.filter((id) => !repliedToIds.has(id));
+      },
+      "mentions",
+      mentionPush(reply.user, reply.text, reply.id),
+      "Could not announce a mention",
+    );
+  }
   return "announced";
 }
 

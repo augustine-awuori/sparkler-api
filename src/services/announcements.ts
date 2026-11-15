@@ -62,6 +62,20 @@ export function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value ? value : undefined;
 }
 
+/** "Kai mentioned you", opening the sparkle or reply that did. */
+export function mentionPush(
+  author: { name?: string; custom?: Record<string, unknown> },
+  text: string | undefined,
+  statusId: string,
+): PushPayload {
+  const handle = handleOf(author);
+  return {
+    title: `${author.name || (handle ? `@${handle}` : "Someone")} mentioned you`,
+    message: pushBody(text, "Tap to see where"),
+    data: { kind: "mention", type: "mention", id: statusId },
+  };
+}
+
 /** A Stream user's handle, kept in `custom.username`. */
 export function handleOf(user: { custom?: Record<string, unknown> } | undefined) {
   return stringOrUndefined(user?.custom?.["username"]);

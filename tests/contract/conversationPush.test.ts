@@ -114,6 +114,22 @@ describe("POST /api/pushTokens/reply", () => {
     });
   });
 
+  it("tells people the reply mentions, except whoever it answers", async () => {
+    const [sender, author, mentioned] = [newId(), await withDevice(), await withDevice()];
+    stream.feeds.getComment.mockResolvedValue({
+      comment: reply(sender, { mentioned_users: [{ id: mentioned }, { id: author }] }),
+    });
+    stream.feeds.getActivity.mockResolvedValue({ activity: { user: { id: author } } });
+
+    await post("reply", sender, { commentId: "reply-1" });
+
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2), { timeout: 20_000 });
+    const pushes = send.mock.calls as unknown as [string[], Record<string, unknown>][];
+    const mention = pushes.find(([, push]) => push.title === "Kai mentioned you");
+    expect(mention?.[0]).toEqual([deviceOf(mentioned)]);
+    expect(mention?.[1]).toMatchObject({ data: { kind: "mention", id: "reply-1" } });
+  });
+
   it("never pushes the replier about their own sparkle", async () => {
     const sender = await withDevice();
     stream.feeds.getComment.mockResolvedValue({ comment: reply(sender) });
