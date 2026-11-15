@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ForbiddenError, UpstreamError } from "../domain/errors.js";
+import { UpstreamError } from "../domain/errors.js";
 import type { PushPayload } from "../utils/pushNotifications.js";
 import { claimAnnouncement, deliverInBackground, handleOf, pushBody } from "./announcements.js";
 import { POINT_VERIFIERS } from "./pointVerifiers.js";
@@ -25,7 +25,8 @@ export const engagementSchema = z.object({
   targetId: z.string().trim().min(1).max(200),
 });
 
-export type EngagementOutcome = "announced" | "already_announced";
+/** `not_verified` covers your own post too: Stream says nobody else did anything. */
+export type EngagementOutcome = "announced" | "already_announced" | "not_verified";
 
 interface Actor {
   id: string;
@@ -47,7 +48,7 @@ interface Target {
  * These were Stream's to send, and its pushes never reached Android: the Stream
  * app has no Firebase provider. Stream is still asked first whether the caller
  * really did this (`POINT_VERIFIERS`, the same check points use), so an account
- * can't buzz someone with a like it never gave. Each is announced once, so
+ * can't buzz someone with a like it never gave, or about its own post. Each is announced once, so
  * unliking and liking again doesn't buzz a second time.
  */
 export async function announceEngagement(
@@ -55,9 +56,7 @@ export async function announceEngagement(
   action: EngagementAction,
   targetId: string,
 ): Promise<EngagementOutcome> {
-  if (!(await verified(actorId, action, targetId))) {
-    throw new ForbiddenError("Stream doesn't show that");
-  }
+  if (!(await verified(actorId, action, targetId))) return "not_verified";
   if (!(await claimAnnouncement(`${action}:${actorId}:${targetId}`, actorId))) {
     return "already_announced";
   }

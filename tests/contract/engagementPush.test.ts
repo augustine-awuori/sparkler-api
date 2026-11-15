@@ -174,13 +174,14 @@ describe("POST /api/pushTokens/engagement", () => {
     });
   });
 
-  it("refuses a like Stream doesn't show", async () => {
+  it("sends nothing for a like Stream doesn't show, or one on your own sparkle", async () => {
     const actor = newId();
-    stream.feeds.getActivity.mockResolvedValue({ activity: { id: "a1", user: { id: newId() } } });
+    stream.feeds.getActivity.mockResolvedValue({ activity: { id: "a1", user: { id: actor } } });
+    stream.feeds.queryActivityReactions.mockResolvedValue(reacted(actor, "like"));
 
     const res = await announce(actor, "like", "a1");
 
-    expect(res.status).toBe(403);
+    expect(res.body.outcome).toBe("not_verified");
     expect(send).not.toHaveBeenCalled();
   });
 
