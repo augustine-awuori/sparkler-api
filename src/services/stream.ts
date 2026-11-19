@@ -26,6 +26,18 @@ export function streamClient(): StreamClient {
 }
 
 /**
+ * Whether Stream answered and said no: the thing doesn't exist (404), or the
+ * id can't name one (400). A timeout, a dropped connection, a 429 or a 5xx is
+ * Stream not answering, which a later try can get past. The SDK doesn't export
+ * its error class, so this reads the HTTP status it attaches.
+ */
+export function isStreamRefusal(error: unknown): boolean {
+  const status = (error as { metadata?: { responseCode?: unknown } } | null | undefined)?.metadata
+    ?.responseCode;
+  return status === 400 || status === 404;
+}
+
+/**
  * A Stream user token for `userId` only. Never persisted, never written to
  * Stream — it travels only inside that user's own JWT (see authToken.ts).
  *
