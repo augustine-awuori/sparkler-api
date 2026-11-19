@@ -45,18 +45,34 @@ async function hasReactedToComment(userId: string, commentId: string, type: stri
   return reactions.some((reaction) => reaction.user.id === userId && reaction.type === type);
 }
 
-/** Your own post is the one thing you can't earn from reacting to. */
-const reactedToSomeoneElsesActivity =
-  (type: string): PointVerifier =>
-  async (userId, activityId) =>
-    (await readActivity(activityId)).user?.id !== userId &&
-    (await hasReactedToActivity(userId, activityId, type));
+async function hasBookmarked(userId: string, activityId: string) {
+  const { bookmarks } = await streamClient().feeds.queryBookmarks({
+    filter: { user_id: userId, activity_id: activityId },
+    limit: 1,
+  });
+  return bookmarks.some((bookmark) => bookmark.user.id === userId);
+}
 
-const reactedToSomeoneElsesComment =
-  (type: string): PointVerifier =>
-  async (userId, commentId) =>
-    (await readComment(commentId)).user?.id !== userId &&
-    (await hasReactedToComment(userId, commentId, type));
+/**
+ * Your own post is the one thing you can't earn from reacting to. Both reads go
+ * at once: the apps give up on a claim after 8 seconds, and one Stream read can
+ * take several.
+ */
+const toSomeoneElses =
+  (
+    read: (id: string) => Promise<Authored>,
+    didIt: (userId: string, targetId: string) => Promise<boolean>,
+  ): PointVerifier =>
+  async (userId, targetId) => {
+    const [post, done] = await Promise.all([read(targetId), didIt(userId, targetId)]);
+    return post.user?.id !== userId && done;
+  };
+
+const reactedToSomeoneElsesActivity = (type: string): PointVerifier =>
+  toSomeoneElses(readActivity, (userId, id) => hasReactedToActivity(userId, id, type));
+
+const reactedToSomeoneElsesComment = (type: string): PointVerifier =>
+  toSomeoneElses(readComment, (userId, id) => hasReactedToComment(userId, id, type));
 
 export const POINT_VERIFIERS: Record<PointAction, PointVerifier> = {
   sparkle: async (userId, activityId) => {
@@ -74,14 +90,7 @@ export const POINT_VERIFIERS: Record<PointAction, PointVerifier> = {
   reply_like: reactedToSomeoneElsesComment("like"),
   reply_resparkle: reactedToSomeoneElsesComment(RESPARKLE),
 
-  bookmark: async (userId, activityId) => {
-    if ((await readActivity(activityId)).user?.id === userId) return false;
-    const { bookmarks } = await streamClient().feeds.queryBookmarks({
-      filter: { user_id: userId, activity_id: activityId },
-      limit: 1,
-    });
-    return bookmarks.some((bookmark) => bookmark.user.id === userId);
-  },
+  bookmark: toSomeoneElses(readActivity, hasBookmarked),
 
   follow: async (userId, theirId) => {
     if (theirId === userId) return false;

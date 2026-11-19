@@ -54,6 +54,10 @@ function aLikedSparkle(userId: string) {
   });
 }
 
+/** What the Stream SDK throws when Stream answers with an error status. */
+const streamAnswered = (status: number) =>
+  Object.assign(new Error(`Stream error: ${status}`), { metadata: { responseCode: status } });
+
 beforeAll(async () => {
   await connectDb(loadConfig().databaseUrl);
   app = createApp();
@@ -137,17 +141,53 @@ describe("claiming points", () => {
     expect((await user.claim("bookmark", "one-more")).body.outcome).toBe("awarded");
   });
 
-  it("awards nothing when Stream can't be reached, and allows a retry", async () => {
+  // `not_verified` here read as a final no, so the apps dropped points Stream never judged.
+  it("asks the app to try later when Stream can't be reached, and awards the retry", async () => {
     const user = await aUser();
     stream.feeds.getActivity.mockRejectedValue(new Error("Stream is down"));
 
     const failed = await user.claim("like", "activity-1");
     expect(failed.status).toBe(200);
-    expect(failed.body).toMatchObject({ outcome: "not_verified", awarded: 0 });
+    expect(failed.body).toMatchObject({ outcome: "try_later", awarded: 0 });
 
     stream.feeds.getActivity.mockReset();
     aLikedSparkle(user.id);
     expect((await user.claim("like", "activity-1")).body.outcome).toBe("awarded");
+  });
+
+  it.each([429, 500, 503])("asks the app to try later when Stream answers %i", async (status) => {
+    const user = await aUser();
+    stream.feeds.getActivity.mockRejectedValue(streamAnswered(status));
+    stream.feeds.queryActivityReactions.mockResolvedValue({ reactions: [] });
+
+    expect((await user.claim("like", "activity-1")).body.outcome).toBe("try_later");
+  });
+
+  it.each([400, 404])("settles it when Stream answers %i, since that's a no", async (status) => {
+    const user = await aUser();
+    stream.feeds.getActivity.mockRejectedValue(streamAnswered(status));
+    stream.feeds.queryActivityReactions.mockResolvedValue({ reactions: [] });
+
+    expect((await user.claim("like", "deleted-activity")).body.outcome).toBe("not_verified");
+  });
+
+  // The apps give up on a claim after 8 seconds, and one Stream read can take several.
+  it("asks Stream about the sparkle and the like at the same time", async () => {
+    const user = await aUser();
+    const steps: string[] = [];
+    stream.feeds.getActivity.mockImplementation(async () => {
+      steps.push("sparkle asked");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      steps.push("sparkle answered");
+      return { activity: { user: { id: "someone-else" } } };
+    });
+    stream.feeds.queryActivityReactions.mockImplementation(async () => {
+      steps.push("like asked");
+      return { reactions: [{ user: { id: user.id }, type: "like" }] };
+    });
+
+    expect((await user.claim("like", "activity-1")).body.outcome).toBe("awarded");
+    expect(steps.indexOf("like asked")).toBeLessThan(steps.indexOf("sparkle answered"));
   });
 
   it.each([

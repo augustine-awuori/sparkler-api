@@ -38,4 +38,14 @@ export const ISSUE_RESOLVED_POINTS = 50;
 export const LEDGER_ACTIONS = [...POINT_ACTIONS, ISSUE_RESOLVED_ACTION] as const;
 export type LedgerAction = (typeof LEDGER_ACTIONS)[number];
 
-export type PointClaimOutcome = "awarded" | "already_claimed" | "daily_cap" | "not_verified";
+/**
+ * `try_later` means Stream couldn't be asked, so nothing was decided or
+ * written: the apps keep the claim and send it again. Installed builds read it
+ * like any other answer that awarded nothing.
+ */
+export type PointClaimOutcome =
+  | "awarded"
+  | "already_claimed"
+  | "daily_cap"
+  | "not_verified"
+  | "try_later";
