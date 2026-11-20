@@ -3,8 +3,10 @@
 //
 //   npx tsx --env-file=.env scripts/configure-stream-push.ts --confirm
 //
-// Add the Firebase provider in the dashboard first (name it "firebase"), or Android
-// gets no templates: Push Notifications > New Configuration > Firebase.
+// Templates go to each provider by the name it has in the dashboard. Both apps
+// register devices under those names: Firebase `sparkler_mobile` and APN `Chats_iOS`.
+// Don't add a second Firebase provider. Devices registered under `sparkler_mobile`
+// would never reach it.
 
 import { StreamClient } from "@stream-io/node-sdk";
 
