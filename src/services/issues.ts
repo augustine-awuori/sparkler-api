@@ -4,6 +4,7 @@ import { NotFoundError } from "../domain/errors.js";
 import {
   ISSUE_STATUSES,
   RESOLVED_STATUSES,
+  isIssueId,
   type IssueStatus,
   type issueChangeSchema,
   type issueListQuerySchema,
@@ -26,6 +27,12 @@ const MAX_ISSUES_PER_HOUR = 5;
 const HOUR_MS = 60 * 60 * 1000;
 
 const SITE = "https://sparkler.website/";
+
+export async function issueOr404(id: string): Promise<IssueDoc> {
+  const issue = isIssueId(id) ? await Issue.findById(id) : null;
+  if (!issue) throw new NotFoundError("That issue doesn't exist");
+  return issue;
+}
 
 /** What the person who reported an issue may see: no notes, handler or triage. */
 export function toReporterView(issue: IssueDoc) {

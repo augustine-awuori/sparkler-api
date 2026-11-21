@@ -3,6 +3,7 @@ import { Router, type Request } from "express";
 import { NotFoundError, UnauthorizedError } from "../domain/errors.js";
 import {
   assignSchema,
+  bookmarkParamsSchema,
   bulkStatusSchema,
   commentSchema,
   developerChangeSchema,
@@ -23,6 +24,7 @@ import { requireIssueStaff, requireStaffAdmin } from "../http/middlewares/requir
 import { Developer } from "../models/developer.js";
 import { ErrorGroup } from "../models/errorGroup.js";
 import { sendInBackground } from "../services/accountMail.js";
+import { addBookmark, listBookmarks, removeBookmark } from "../services/bookmarks.js";
 import {
   changeDeveloper,
   developerFor,
@@ -265,6 +267,39 @@ router.post(
     const { body } = commentSchema.parse(req.body);
     const group = await commentOnGroup(await groupOr404(req.params.id), staffOf(req), body);
     res.status(201).send(toGroupView(group));
+  }),
+);
+
+// ── Bookmarks ─────────────────────────────────────────────────────────────
+// Each person's own: errors and reports saved to come back to.
+
+type BookmarkParams = { kind: string; id: string };
+
+router.get(
+  "/bookmarks",
+  ...staff,
+  handler(async (req, res) => {
+    res.send(await listBookmarks(staffOf(req).developerId));
+  }),
+);
+
+router.put(
+  "/bookmarks/:kind/:id",
+  ...staff,
+  handler<BookmarkParams>(async (req, res) => {
+    const { kind, id } = bookmarkParamsSchema.parse(req.params);
+    await addBookmark(staffOf(req).developerId, kind, id);
+    res.status(204).end();
+  }),
+);
+
+router.delete(
+  "/bookmarks/:kind/:id",
+  ...staff,
+  handler<BookmarkParams>(async (req, res) => {
+    const { kind, id } = bookmarkParamsSchema.parse(req.params);
+    await removeBookmark(staffOf(req).developerId, kind, id);
+    res.status(204).end();
   }),
 );
 

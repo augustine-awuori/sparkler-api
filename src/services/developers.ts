@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import { BadRequestError, NotFoundError } from "../domain/errors.js";
 import type { DeveloperRole, developerChangeSchema } from "../domain/errorTracking.types.js";
+import { Bookmark } from "../models/bookmark.js";
 import { Developer, type DeveloperDoc } from "../models/developer.js";
 import { ErrorGroup, type DeveloperRef } from "../models/errorGroup.js";
 import type { SparklerDoc } from "../models/sparkler.js";
@@ -131,13 +132,15 @@ export async function changeDeveloper(
 
 /**
  * On account deletion. The record stays, as "Deleted account", so timelines
- * still say a teammate fixed something, but their email and access go.
+ * still say a teammate fixed something, but their email and access go. Their
+ * bookmarks were only ever theirs, so those go too.
  */
 export async function forgetDeveloper(sparklerId: string): Promise<void> {
-  await Developer.updateOne(
+  const developer = await Developer.findOneAndUpdate(
     { sparklerId },
     { $set: { status: "removed", name: "Deleted account", email: "", photo: "" } },
   );
+  if (developer) await Bookmark.deleteMany({ developerId: developer._id.toString() });
 }
 
 /**

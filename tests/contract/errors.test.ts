@@ -6,6 +6,8 @@ import jwt from "jsonwebtoken";
 import { createApp } from "../../src/app.js";
 import { connectDb, disconnectDb } from "../../src/config/db.js";
 import { loadConfig } from "../../src/config/index.js";
+import { MAX_BOOKMARKS } from "../../src/domain/errorTracking.types.js";
+import { Bookmark } from "../../src/models/bookmark.js";
 import { Developer } from "../../src/models/developer.js";
 import { ErrorEvent } from "../../src/models/errorEvent.js";
 import { ErrorGroup } from "../../src/models/errorGroup.js";
@@ -36,7 +38,7 @@ async function aUser(custom: Record<string, unknown> = {}) {
   }).save();
   const id = user._id.toString();
   const token = jwt.sign({ id, custom: {} }, process.env.jwtPrivateKey as string);
-  const as = (method: "get" | "post" | "patch", path: string) =>
+  const as = (method: "get" | "post" | "patch" | "put" | "delete", path: string) =>
     request(app)[method](path).set("x-auth-token", token);
   return { id, email: user.email, name: user.name as string, token, as };
 }
@@ -420,5 +422,89 @@ describe("developer records", () => {
 
     const record = await Developer.findById(developer.developerId).orFail();
     expect(record).toMatchObject({ status: "removed", name: "Deleted account", email: "" });
+  });
+});
+
+describe("bookmarks", () => {
+  async function anError() {
+    const event = anEvent();
+    await report(event);
+    return (await groupOf(event))._id.toString();
+  }
+
+  async function aUserReport() {
+    const reporter = await aUser();
+    const res = await reporter
+      .as("post", "/api/issues")
+      .send({ type: "bug", title: "Feed won't load", description: "Spinner forever", source: "web" });
+    return res.body.id as string;
+  }
+
+  it("are each person's own, newest first, with the error or report in them", async () => {
+    const admin = await anAdmin();
+    const developer = await aDeveloper(admin);
+    const errorId = await anError();
+    const issueId = await aUserReport();
+
+    expect((await admin.as("put", `/api/errors/bookmarks/error/${errorId}`)).status).toBe(204);
+    expect((await admin.as("put", `/api/errors/bookmarks/issue/${issueId}`)).status).toBe(204);
+
+    const mine = await admin.as("get", "/api/errors/bookmarks");
+    expect(mine.status).toBe(200);
+    expect(mine.body).toMatchObject([
+      { kind: "issue", targetId: issueId, issue: { id: issueId, title: "Feed won't load" } },
+      { kind: "error", targetId: errorId, group: { id: errorId, errorClass: "TypeError" } },
+    ]);
+    expect(typeof mine.body[0].bookmarkedAt).toBe("string");
+    expect((await developer.as("get", "/api/errors/bookmarks")).body).toEqual([]);
+  });
+
+  it("keep one when added twice, and removing one twice is fine", async () => {
+    const admin = await anAdmin();
+    const errorId = await anError();
+    const path = `/api/errors/bookmarks/error/${errorId}`;
+
+    await admin.as("put", path);
+    await admin.as("put", path);
+    expect((await admin.as("get", "/api/errors/bookmarks")).body).toHaveLength(1);
+
+    expect((await admin.as("delete", path)).status).toBe(204);
+    expect((await admin.as("delete", path)).status).toBe(204);
+    expect((await admin.as("get", "/api/errors/bookmarks")).body).toEqual([]);
+  });
+
+  it("refuse what doesn't exist, a kind they don't know, and anyone off the team", async () => {
+    const admin = await anAdmin();
+    const missing = "0".repeat(24);
+
+    expect((await admin.as("put", `/api/errors/bookmarks/error/${missing}`)).status).toBe(404);
+    expect((await admin.as("put", `/api/errors/bookmarks/issue/${missing}`)).status).toBe(404);
+    expect((await admin.as("put", `/api/errors/bookmarks/event/${missing}`)).status).toBe(400);
+    expect((await (await aUser()).as("get", "/api/errors/bookmarks")).status).toBe(403);
+  });
+
+  it(`stop at ${MAX_BOOKMARKS}, so the list stays one request`, async () => {
+    const admin = await anAdmin();
+    await Bookmark.insertMany(
+      Array.from({ length: MAX_BOOKMARKS }, (_, index) => ({
+        developerId: admin.developerId,
+        kind: "error",
+        targetId: index.toString(16).padStart(24, "0"),
+      })),
+    );
+
+    const res = await admin.as("put", `/api/errors/bookmarks/error/${await anError()}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("Remove one first");
+  });
+
+  it("go with a deleted account", async () => {
+    const admin = await anAdmin();
+    const developer = await aDeveloper(admin);
+    await developer.as("put", `/api/errors/bookmarks/error/${await anError()}`);
+
+    await request(app).delete("/api/sparklers").set("x-auth-token", developer.token);
+
+    expect(await Bookmark.countDocuments({ developerId: developer.developerId })).toBe(0);
   });
 });
