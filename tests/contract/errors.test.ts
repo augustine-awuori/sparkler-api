@@ -383,6 +383,36 @@ describe("reading errors", () => {
     expect(stats.body.topGroups.length).toBeGreaterThan(0);
   });
 
+  it("names who hit each event from their profile, never with their email", async () => {
+    const admin = await anAdmin();
+    const person = await aUser();
+    await Sparkler.updateOne(
+      { _id: person.id },
+      { $set: { image: "https://img.test/ana.png", "custom.school": "Strathmore", studentVerifiedAt: new Date() } },
+    );
+    const gone = await aUser();
+    const event = anEvent();
+    await report(event, person.token);
+    await report(event);
+    await report(event, gone.token);
+    await request(app).delete("/api/sparklers").set("x-auth-token", gone.token);
+    const id = (await groupOf(event))._id.toString();
+
+    const { body } = await admin.as("get", `/api/errors/groups/${id}/events`);
+    const byUser = (userId?: string) => body.events.find((each: { userId?: string }) => each.userId === userId);
+
+    expect(byUser(person.id).user).toMatchObject({
+      id: person.id,
+      name: person.name,
+      image: "https://img.test/ana.png",
+      studentVerified: true,
+      custom: { username: expect.any(String), school: "Strathmore" },
+    });
+    expect(JSON.stringify(byUser(person.id).user)).not.toContain(person.email);
+    expect(byUser(undefined).user).toBeNull();
+    expect(byUser(gone.id).user).toBeNull();
+  });
+
   it("bulk-ignores errors", async () => {
     const admin = await anAdmin();
     const first = anEvent();

@@ -28,6 +28,7 @@ import {
   type MailPerson,
 } from "./errorMail.js";
 import type { MailInput } from "./mail.js";
+import { findDirectoryUsers } from "./users.js";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -226,13 +227,19 @@ export async function listGroups(
   };
 }
 
+/**
+ * Each event carries who hit it, as the public directory shows them (never an
+ * email), so the dashboard can show a person rather than an id. `user` is null
+ * when they were signed out or their account is gone.
+ */
 export async function listEvents(group: ErrorGroupDoc, cursor: string | undefined, limit: number) {
   const events = await ErrorEvent.find({ groupId: group._id, ...(cursor && { _id: { $lt: cursor } }) })
     .sort({ _id: -1 })
     .limit(limit + 1);
   const page = events.slice(0, limit);
+  const people = await findDirectoryUsers(page.flatMap((event) => (event.userId ? [event.userId] : [])));
   return {
-    events: page.map(toEventView),
+    events: page.map((event) => ({ ...toEventView(event), user: people.get(event.userId ?? "") ?? null })),
     nextCursor: events.length > limit ? (page[page.length - 1]?._id.toString() ?? null) : null,
   };
 }
