@@ -413,6 +413,23 @@ describe("reading errors", () => {
     expect(byUser(gone.id).user).toBeNull();
   });
 
+  it("gives a team admin someone's email to reach out, and nobody else", async () => {
+    const admin = await anAdmin();
+    const developer = await aDeveloper(admin);
+    const person = await aUser();
+    const gone = await aUser();
+    await request(app).delete("/api/sparklers").set("x-auth-token", gone.token);
+
+    const asAdmin = await admin.as("get", `/api/errors/people/${person.id}/contact`);
+    expect(asAdmin.status).toBe(200);
+    expect(asAdmin.body).toEqual({ email: person.email });
+
+    expect((await developer.as("get", `/api/errors/people/${person.id}/contact`)).status).toBe(403);
+    expect((await person.as("get", `/api/errors/people/${person.id}/contact`)).status).toBe(403);
+    expect((await admin.as("get", `/api/errors/people/${gone.id}/contact`)).status).toBe(404);
+    expect((await admin.as("get", "/api/errors/people/not-an-id/contact")).status).toBe(404);
+  });
+
   it("bulk-ignores errors", async () => {
     const admin = await anAdmin();
     const first = anEvent();

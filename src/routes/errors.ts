@@ -53,6 +53,7 @@ import {
   type WorkflowResult,
 } from "../services/errorGroups.js";
 import { accessApprovedMail, accessRequestedMails } from "../services/errorMail.js";
+import { findSparklerById } from "../services/users.js";
 
 type IdParams = { id: string };
 
@@ -267,6 +268,25 @@ router.post(
     const { body } = commentSchema.parse(req.body);
     const group = await commentOnGroup(await groupOr404(req.params.id), staffOf(req), body);
     res.status(201).send(toGroupView(group));
+  }),
+);
+
+// ── People ────────────────────────────────────────────────────────────────
+
+/**
+ * How to email someone who hit an error, for a team admin who wants to reach
+ * out. Event lists carry the public directory view, never an email; this hands
+ * one over only when an admin asks for that person, and logs who asked.
+ */
+router.get(
+  "/people/:id/contact",
+  ...staff,
+  requireStaffAdmin,
+  handler<IdParams>(async (req, res) => {
+    const person = await findSparklerById(req.params.id);
+    if (!person) throw new NotFoundError("That person no longer has an account");
+    req.log.info({ userId: req.params.id, by: staffOf(req).developerId }, "Showed a user's email to a team admin");
+    res.send({ email: person.email });
   }),
 );
 
