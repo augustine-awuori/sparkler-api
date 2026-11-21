@@ -108,3 +108,13 @@ export async function findSparklerById(id: string): Promise<SparklerDoc | null> 
 
   return await Sparkler.findById(id);
 }
+
+/**
+ * Many users in one query, as the public directory shows them, keyed by id.
+ * Ids that aren't ObjectIds, or whose account is gone, are simply missing.
+ */
+export async function findDirectoryUsers(ids: Iterable<string>): Promise<Map<string, DirectoryUser>> {
+  const valid = [...new Set(ids)].filter((id) => isValidObjectId(id));
+  const users = valid.length ? await Sparkler.find({ _id: { $in: valid } }) : [];
+  return new Map(users.map((user) => [user._id.toString(), toDirectoryUser(user)]));
+}

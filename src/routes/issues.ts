@@ -2,7 +2,6 @@ import { Router } from "express";
 
 import { NotFoundError, TooManyRequestsError } from "../domain/errors.js";
 import {
-  isIssueId,
   issueChangeSchema,
   issueListQuerySchema,
   issueNoteSchema,
@@ -19,6 +18,7 @@ import {
   createIssue,
   isReportLimitReached,
   issueListFilter,
+  issueOr404,
   issueReportedMails,
   issueSummary,
   reporterResolvedPush,
@@ -35,12 +35,6 @@ import type { Logger } from "../utils/logger.js";
 type IdParams = { id: string };
 
 const router = Router();
-
-async function issueOr404(id: string): Promise<IssueDoc> {
-  const issue = isIssueId(id) ? await Issue.findById(id) : null;
-  if (!issue) throw new NotFoundError("That issue doesn't exist");
-  return issue;
-}
 
 /** Never awaited: a mail problem must not undo a change that's already saved. */
 function tellReporter(log: Logger, issue: IssueDoc, entriesSeen: number) {

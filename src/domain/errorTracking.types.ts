@@ -152,3 +152,14 @@ export const developerListQuerySchema = z.object({
 export function isObjectId(value: string): boolean {
   return OBJECT_ID.test(value);
 }
+
+/** What a team member can bookmark: an error group, or a user's report from `/api/issues`. */
+export const BOOKMARK_KINDS = ["error", "issue"] as const;
+export type BookmarkKind = (typeof BOOKMARK_KINDS)[number];
+/** The list comes back whole, with every item in it, so it can't grow without bound. */
+export const MAX_BOOKMARKS = 200;
+
+export const bookmarkParamsSchema = z.object({
+  kind: z.enum(BOOKMARK_KINDS),
+  id: objectId,
+});

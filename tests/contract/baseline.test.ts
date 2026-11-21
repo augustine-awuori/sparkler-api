@@ -168,6 +168,11 @@ describe("auth gating", () => {
     ["POST /api/mails/all", () => api().post("/api/mails/all")],
     ["GET /api/errors/groups", () => api().get("/api/errors/groups")],
     ["GET /api/errors/stats", () => api().get("/api/errors/stats")],
+    ["GET /api/errors/bookmarks", () => api().get("/api/errors/bookmarks")],
+    [
+      "GET /api/errors/people/:id/contact",
+      () => api().get(`/api/errors/people/${new mongoose.Types.ObjectId().toString()}/contact`),
+    ],
     ["POST /api/errors/developers/register", () => api().post("/api/errors/developers/register")],
   ];
 
