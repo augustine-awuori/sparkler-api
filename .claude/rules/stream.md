@@ -5,6 +5,8 @@ paths:
   - "src/services/authToken.ts"
   - "src/domain/stream.types.ts"
   - "scripts/revoke-stream-tokens.ts"
+  - "src/services/streamPushTemplates.ts"
+  - "scripts/configure-stream-push.ts"
 ---
 
 # Stream integration and credentials
@@ -15,3 +17,6 @@ paths:
 - `issueAuthToken()` is the single JWT builder and must whitelist claims. Both clients use the token for Stream Feeds and Chat.
 - Feed tokens are permanent because clients cache their JWT and do not check `exp`. Do not make them expire until clients re-authenticate on expiry. Use `scripts/revoke-stream-tokens.ts` to revoke existing tokens.
 - A follower's id is `follow.source_feed.id`, because `timeline:<id>` follows `user:<id>`. `blocked_user_ids` from `queryUsers` holds who that user blocked; checked against `getBlockedUsers` on the real app.
+- Push templates live in `src/services/streamPushTemplates.ts`, and only reach Stream when `scripts/configure-stream-push.ts --confirm` runs, so a test can't show what's live. Read the live setup with `getPushTemplates` and `feeds.getFeedGroup`.
+- Stream's Firebase defaults are data-only, which the phones never show. Each Firebase template puts its banner in `android.notification` and repeats it in `data` for web's service worker. Never use a top-level `notification`: a browser shows that by itself, and the worker would show it again.
+- DMs never showed on Android (2026-11-22): `message.new` had no Firebase template, and the script had never been run on the live app, so feed pushes were off too. `pushTemplateUpserts` now lists `message.new`. iPhones keep Stream's APN default for it, which sets the unread badge.
