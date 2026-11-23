@@ -324,8 +324,31 @@ router.post(
   }),
 );
 
-// Deletes the caller's own account: the Sparkler, their push tokens, and their
-// Stream user. Stream is best-effort — Mongo is the source of truth.
+/**
+ * Stream keeps feeds data apart from the user record: `deleteUsers` covers the
+ * user, their messages and conversations, and `deleteFeedUserData` their
+ * sparkles, replies, reactions, follows and bookmarks. Until 2026-11-22 only
+ * `deleteUsers` ran, and Stream's docs give it no part in feeds data. Feeds
+ * data goes first, while the user it belongs to still exists.
+ * https://getstream.io/activity-feeds/docs/node/gdpr/
+ */
+async function eraseFromStream(log: Logger, userId: string): Promise<void> {
+  const client = streamClient();
+  try {
+    await client.feeds.deleteFeedUserData({ user_id: userId, hard_delete: true });
+  } catch (err) {
+    log.error({ err, userId }, "Stream feeds data delete failed");
+  }
+  try {
+    await client.deleteUsers({ user_ids: [userId], user: "hard" });
+  } catch (err) {
+    log.error({ err, userId }, "Stream user delete failed");
+  }
+}
+
+// Deletes the caller's own account: the Sparkler, their push tokens, and
+// everything of theirs on Stream. Stream is best-effort — Mongo is the source
+// of truth.
 router.delete(
   "/",
   auth,
@@ -341,12 +364,7 @@ router.delete(
     await forgetGatheringsOf(user._id.toString());
     await forgetDeveloper(user._id.toString());
     sendInBackground(req.log, [accountDeletedMail(user)]);
-
-    try {
-      await streamClient().deleteUsers({ user_ids: [user._id.toString()], user: "hard" });
-    } catch (err) {
-      req.log.error({ err, userId: user._id.toString() }, "Stream user delete failed");
-    }
+    await eraseFromStream(req.log, user._id.toString());
 
     res.send({ success: true });
   }),
