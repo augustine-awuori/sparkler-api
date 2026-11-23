@@ -1,5 +1,5 @@
-// Turns on Stream's own push for follows, replies, likes and mentions, for every
-// push provider set up in the Stream dashboard. Safe to run again.
+// Turns on Stream's own push for follows, replies, likes, mentions and messages,
+// for every push provider set up in the Stream dashboard. Safe to run again.
 //
 //   npx tsx --env-file=.env scripts/configure-stream-push.ts --confirm
 //
@@ -12,12 +12,9 @@ import { StreamClient } from "@stream-io/node-sdk";
 
 import { requireEnv } from "../src/config/env.js";
 import {
-  DISABLED_STREAM_PUSH_EVENT,
-  STREAM_PUSH_COPY,
   USER_FEED_PUSH_TYPES,
-  streamPushTemplate,
-  type StreamPushEvent,
-  type StreamPushProviderType,
+  pushTemplateUpserts,
+  type StreamPushProvider,
 } from "../src/services/streamPushTemplates.js";
 
 if (!process.argv.includes("--confirm")) {
@@ -31,7 +28,7 @@ const client = new StreamClient(requireEnv("NEW_FEED_API_KEY"), requireEnv("NEW_
 
 const { push_providers: providers = [] } = await client.listPushProviders();
 const supported = providers.filter(
-  (provider): provider is typeof provider & { type: StreamPushProviderType } =>
+  (provider): provider is typeof provider & StreamPushProvider =>
     provider.type === "firebase" || provider.type === "apn",
 );
 if (!supported.some((provider) => provider.type === "firebase")) {
@@ -44,23 +41,11 @@ await client.feeds.updateFeedGroup({
 });
 console.log("Enabled push on the user feed group");
 
-for (const { type, name } of supported) {
-  for (const event of Object.keys(STREAM_PUSH_COPY) as StreamPushEvent[]) {
-    await client.upsertPushTemplate({
-      event_type: event,
-      push_provider_type: type,
-      push_provider_name: name,
-      enable_push: true,
-      template: streamPushTemplate(event, type),
-    });
+for (const provider of supported) {
+  for (const upsert of pushTemplateUpserts(provider)) {
+    await client.upsertPushTemplate(upsert);
   }
-  await client.upsertPushTemplate({
-    event_type: DISABLED_STREAM_PUSH_EVENT,
-    push_provider_type: type,
-    push_provider_name: name,
-    enable_push: false,
-  });
-  console.log(`Templates saved for ${name} (${type})`);
+  console.log(`Templates saved for ${provider.name} (${provider.type})`);
 }
 
 process.exit(0);
